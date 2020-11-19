@@ -1,0 +1,7 @@
+
+DESCRIPTION="Count characters, words, and lines in FSF's cccp.c"
+SETUP="ln -sf ${BENCH_DIR}/input1/cccp.c .";
+PREFIX="";
+ARGS="cccp.c";
+CHECK="diff ${RESULT_FILE} ${BENCH_DIR}/output1/result.out"
+CLEANUP="rm -f cccp.c";

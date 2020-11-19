@@ -1,0 +1,6 @@
+DESCRIPTION="SPEC92/benchspec/026.compress/input.ref"
+SETUP="ln -sf ${BENCH_DIR}/input1/compress.in .";
+PREFIX="";
+ARGS=" compress.in";
+CHECK="diff compress.in.Z ${BENCH_DIR}/output1/result.out"
+CLEANUP="rm -f compress.in compress.in.Z";
