@@ -3,8 +3,26 @@
 
 #include <stdio.h>
 
-void temp(/*void* ptr*/) {
-    printf("hello world\n");
-}
+// TODO: Optimize logging with internal DS and last-second flush to file
 
+// struct LogLine {
+//     const char* funcName;
+//     const char* instName;
+//     void* addr;
+//     size_t size;
+// };
+
+// struct LogLineChunk {
+//     struct LogLine ll[10000000];
+//     struct LogLineChunk* next;
+//     size_t size;
+// };
+
+// TODO: parameters for: function name, full instruction name, address, size of op
+void temp(/*const char* funcName, const char* instName, */void* addr/*, size_t size*/) {
+    static FILE* instLogFile = NULL;
+    if (instLogFile == NULL) instLogFile = fopen("log.log", "w+");
+    printf("temp got addr: %p\n", addr);
+    // fprintf(instLogFile, "%s\n%s\n%p\n%zu\n\n", funcName, instName, addr, size);
+}
 #endif /* _FP_H_ */
