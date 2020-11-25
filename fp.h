@@ -19,10 +19,10 @@
 // };
 
 // TODO: parameters for: function name, full instruction name, address, size of op
-void temp(/*const char* funcName, const char* instName, */void* addr/*, size_t size*/) {
+void temp(void* addr, size_t size, const char* funcName/*, const char* instName*/) {
     static FILE* instLogFile = NULL;
     if (instLogFile == NULL) instLogFile = fopen("log.log", "w+");
-    printf("temp got addr: %p\n", addr);
+    fprintf(instLogFile, "%s\n%p\n%zu\n", funcName, addr, size);
     // fprintf(instLogFile, "%s\n%s\n%p\n%zu\n\n", funcName, instName, addr, size);
 }
 #endif /* _FP_H_ */

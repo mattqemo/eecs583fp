@@ -7,6 +7,9 @@
 #include "llvm/Analysis/LoopInfo.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/DataLayout.h"
+#include "llvm/IR/InstrTypes.h"
+#include "llvm/IR/Constants.h"
+#include <array>
 
 #include "instructionSets.h"
 
@@ -19,6 +22,8 @@ using namespace llvm;
 namespace {
 struct InjectInstLog : public ModulePass {
   static char ID;
+  static const size_t INST_LOG_PTR_PARAM_INDEX = 0;
+  static const size_t INST_LOG_SIZE_PARAM_INDEX = 1;
 
   InjectInstLog() : ModulePass(ID) {}
 
@@ -35,19 +40,13 @@ entry:
 */
 
   // template <typename MEM_INST_TYPE>
-  // static uint64_t memInstSize(const MEM_INST_TYPE* memInst, const DataLayout* dataLayout) {
-  //   static_assert(std::is_same_v<MEM_INST_TYPE, LoadInst> || std::is_same_v<MEM_INST_TYPE, StoreInst>, "Mem instructions must be one of LoadInst or StoreInst");
-  //   return dataLayout->getTypeStoreSize(memInst->getPointerOperand()->getType()->getPointerElementType());
-  //   // if (const auto* loadInst = dyn_cast<LoadInst>(memInst)) {
-  //   //   errs() << "Load inst: " << *loadInst << "\n";
-  //   //   errs() << "ptr operand" << *loadInst->getPointerOperand() << "\n";
-  //   //   errs() << "type of pointer" << *loadInst->getPointerOperand()->getType() << "\n";
-  //   //   errs() << "pointee element type" << *loadInst->getPointerOperand()->getType()->getPointerElementType() << "\n";
-  //   //   return dataLayout->getTypeStoreSize(loadInst->getPointerOperand()->getType()->getPointerElementType());
-  //   // } else if (const auto* storeInst = dyn_cast<StoreInst>(memInst)) {
-  //   //   return dataLayout->getTypeStoreSize(storeInst->getPointerOperand()->getType()->getPointerElementType());
-  //   // }
-  // }
+  static uint64_t memInstSize(const Instruction* memInst, const DataLayout* dataLayout) {
+    if (const auto* loadInst = dyn_cast<LoadInst>(memInst)) {
+      return dataLayout->getTypeStoreSize(loadInst->getPointerOperand()->getType()->getPointerElementType());
+    } else if (const auto* storeInst = dyn_cast<StoreInst>(memInst)) {
+      return dataLayout->getTypeStoreSize(storeInst->getPointerOperand()->getType()->getPointerElementType());
+    }
+  }
 
 
 
@@ -69,18 +68,30 @@ entry:
     auto* instLogFunc = m.getFunction("temp");
     for (auto& func : m) {
       if (&func == instLogFunc) continue;
-      auto funcName = func.getName();
+      auto* zeroValue = ConstantInt::get(Type::getInt64Ty(func.getContext()), 0);
+      std::array<Value*, 2> gepIdxArgs = {zeroValue, zeroValue};
       for (auto& bb : func) {
+        // https://stackoverflow.com/questions/16656855/llvm-ir-string-initialization
+        auto* funcNameCStrParam = ConstantDataArray::getString(func.getContext(), func.getName());
+        auto* funcNameCStrParamType = cast<ConstantDataArray>(funcNameCStrParam);
+
+        // TODO: try https://llvm.org/doxygen/Instructions_8h_source.html#l00965
+        // TODO: Pass correct params to gep create call - how to pass in pointer to our constant array funcNameCStrParam?
+        auto* getEltPtrToFuncName = GetElementPtrInst::Create(PointerType::getUnqual(funcNameCStrParam->getType()), funcNameCStrParam, ArrayRef<Value*>(gepIdxArgs));
         for (auto& inst : bb) {
           if (isa<LoadInst>(inst) or isa<StoreInst>(inst)) {
             changed = true;
-            auto instName = inst.getName();
             errs() << "creating callinst\n";
-            // TODO: Create constant value C-strings to pass to CallInst::Create
-            // uint64_t size = memInstSize(&inst, dataLayout); // TODO: Create constant value and pass to func
-            // TODO: Inject bitcast so arbitrary ptr value can be passed as void*
-            // TODO: Get a create func from https://llvm.org/doxygen/classllvm_1_1CastInst.html
-            // CallInst::Create(instLogFunc->getFunctionType(), instLogFunc, {getPointerValueOfMemInst(&inst)}, "", &inst); //https://llvm.org/doxygen/classllvm_1_1CallInst.html
+            auto* instLogSizeParamType = instLogFunc->getFunctionType()->getFunctionParamType(INST_LOG_SIZE_PARAM_INDEX);
+            auto* sizeParam = ConstantInt::get(instLogSizeParamType, memInstSize(&inst, dataLayout));
+            auto* instLogPtrParamType = instLogFunc->getFunctionType()->getFunctionParamType(INST_LOG_PTR_PARAM_INDEX);
+            auto* castPtrParam = CastInst::CreatePointerCast(getPointerValueOfMemInst(&inst), instLogPtrParamType, "", &inst); //https://llvm.org/doxygen/classllvm_1_1CastInst.html  
+
+            // auto* instNameCStrParam = ConstantDataArray::getString(func.getContext(), inst.getName());
+            // auto* getEltPtrToInstName = GetElementPtrInst::Create
+            
+            // TODO: add instName and funcName to Create call 
+            CallInst::Create(instLogFunc->getFunctionType(), instLogFunc, {castPtrParam, sizeParam, funcNameCStrParam}, "", &inst); //https://llvm.org/doxygen/classllvm_1_1CallInst.html
           }
         }
       }

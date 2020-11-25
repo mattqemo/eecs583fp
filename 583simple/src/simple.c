@@ -2,14 +2,11 @@
 
 #include "../../fp.h"
 
-void func(void* ptr) {}
-
 int main()
 {
   int x = 10;
   int y = x;
   int* yPtr = &y;
-  func("blah");
   // temp(&x);
 
   // int in[1000];
