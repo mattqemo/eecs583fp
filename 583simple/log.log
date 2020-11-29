@@ -1,12 +1,42 @@
-temp got addr: 0x7fffb55c481c
+0
+0x7fff4094d1dc
 4
-temp got addr: 0x7fffb55c4818
+S
+main
+
+1
+0x7fff4094d1d8
 4
-temp got addr: 0x7fffb55c4818
+S
+main
+
+2
+0x7fff4094d1d8
 4
-temp got addr: 0x7fffb55c4814
+L
+main
+
+3
+0x7fff4094d1d4
 4
-temp got addr: 0x7fffb55c4808
+S
+main
+
+4
+0x7fff4094d1c8
 8
-temp got addr: 0x7fffb55c47e8
+S
+main
+
+5
+0x7fff4094d1c0
 8
+S
+main
+
+6
+0x7fff4094d1c0
+8
+L
+main
+

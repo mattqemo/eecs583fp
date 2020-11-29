@@ -7,6 +7,9 @@ int main()
   int x = 10;
   int y = x;
   int* yPtr = &y;
+  const char* str = "blah1\n";
+  printf(str);
+  printf("blah2\n");
   // temp(&x);
 
   // int in[1000];

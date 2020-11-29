@@ -22,8 +22,6 @@ using namespace llvm;
 namespace {
 struct InjectInstLog : public ModulePass {
   static char ID;
-  static const size_t INST_LOG_PTR_PARAM_INDEX = 0;
-  static const size_t INST_LOG_SIZE_PARAM_INDEX = 1;
 
   InjectInstLog() : ModulePass(ID) {}
 
@@ -48,8 +46,6 @@ entry:
     }
   }
 
-
-
   static Value* getPointerValueOfMemInst(Instruction* memInst) {
     // static_assert(std::is_same_v<MEM_INST_TYPE, LoadInst> || std::is_same_v<MEM_INST_TYPE, StoreInst>, "Mem instructions must be one of LoadInst or StoreInst");
     if (auto* loadInst = dyn_cast<LoadInst>(memInst)) {
@@ -61,37 +57,55 @@ entry:
     }
   }
 
+  Constant* getElementPtrToCStr(Module& m, Function &func, const StringRef& string) {
+    auto* zeroValue = ConstantInt::get(Type::getInt64Ty(func.getContext()), 0);
+    std::array<Value*, 2> gepIdxArgs = {zeroValue, zeroValue};
+
+    auto* strData = ConstantDataArray::getString(func.getContext(), string);
+    // TODO: OK to just leak this, probably
+    auto* gv = new GlobalVariable(/*Module=*/m,
+      /*Type=*/strData->getType(),
+      /*isConstant=*/true,
+      /*Linkage=*/GlobalVariable::PrivateLinkage,
+      /*Initializer=*/strData,
+      /*Name=*/string);
+
+    return ConstantExpr::getInBoundsGetElementPtr(strData->getType(), gv, gepIdxArgs);
+  }
+
   bool runOnModule(Module &m) override {
     auto* dataLayout = new DataLayout(&m);
     bool changed = false;
     // auto& loopInfo = getAnalysis<LoopInfoWrapperPass>().getLoopInfo();
     auto* instLogFunc = m.getFunction("temp");
+    size_t instID = 0;
     for (auto& func : m) {
       if (&func == instLogFunc) continue;
-      auto* zeroValue = ConstantInt::get(Type::getInt64Ty(func.getContext()), 0);
-      std::array<Value*, 2> gepIdxArgs = {zeroValue, zeroValue};
+      auto* funcNameStrPtr = getElementPtrToCStr(m, func, func.getName());
       for (auto& bb : func) {
-        // https://stackoverflow.com/questions/16656855/llvm-ir-string-initialization
-        auto* funcNameCStrParam = ConstantDataArray::getString(func.getContext(), func.getName());
-        auto* funcNameCStrParamType = cast<ConstantDataArray>(funcNameCStrParam);
-
-        // TODO: try https://llvm.org/doxygen/Instructions_8h_source.html#l00965
-        // TODO: Pass correct params to gep create call - how to pass in pointer to our constant array funcNameCStrParam?
-        auto* getEltPtrToFuncName = GetElementPtrInst::Create(PointerType::getUnqual(funcNameCStrParam->getType()), funcNameCStrParam, ArrayRef<Value*>(gepIdxArgs));
         for (auto& inst : bb) {
           if (isa<LoadInst>(inst) or isa<StoreInst>(inst)) {
+            size_t currentInstID = instID++;
+            char memInstType = isa<LoadInst>(inst) ? 'L' : 'S';
+
             changed = true;
             errs() << "creating callinst\n";
-            auto* instLogSizeParamType = instLogFunc->getFunctionType()->getFunctionParamType(INST_LOG_SIZE_PARAM_INDEX);
-            auto* sizeParam = ConstantInt::get(instLogSizeParamType, memInstSize(&inst, dataLayout));
-            auto* instLogPtrParamType = instLogFunc->getFunctionType()->getFunctionParamType(INST_LOG_PTR_PARAM_INDEX);
-            auto* castPtrParam = CastInst::CreatePointerCast(getPointerValueOfMemInst(&inst), instLogPtrParamType, "", &inst); //https://llvm.org/doxygen/classllvm_1_1CastInst.html  
+            auto* IDParam = ConstantInt::get(
+              instLogFunc->getFunctionType()->getFunctionParamType(0),
+              currentInstID);
+            auto* castPtrParam = CastInst::CreatePointerCast(
+              getPointerValueOfMemInst(&inst),
+              instLogFunc->getFunctionType()->getFunctionParamType(1),
+              "",
+              &inst); //https://llvm.org/doxygen/classllvm_1_1CastInst.html
+            auto* sizeParam = ConstantInt::get(
+              instLogFunc->getFunctionType()->getFunctionParamType(2),
+              memInstSize(&inst, dataLayout));
+            auto* memTypeParam = ConstantInt::get(
+              instLogFunc->getFunctionType()->getFunctionParamType(3),
+              memInstType);
 
-            // auto* instNameCStrParam = ConstantDataArray::getString(func.getContext(), inst.getName());
-            // auto* getEltPtrToInstName = GetElementPtrInst::Create
-            
-            // TODO: add instName and funcName to Create call 
-            CallInst::Create(instLogFunc->getFunctionType(), instLogFunc, {castPtrParam, sizeParam, funcNameCStrParam}, "", &inst); //https://llvm.org/doxygen/classllvm_1_1CallInst.html
+            CallInst::Create(instLogFunc->getFunctionType(), instLogFunc, {IDParam, castPtrParam, sizeParam, memTypeParam, funcNameStrPtr}, "", &inst); //https://llvm.org/doxygen/classllvm_1_1CallInst.html
           }
         }
       }
