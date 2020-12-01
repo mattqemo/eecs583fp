@@ -2,14 +2,22 @@
 
 #include "../../fp.h"
 
+void randomfcn() {
+  int a = 5;
+  a = a;
+  int b = a;
+}
+
 int main()
 {
   int x = 10;
   int y = x;
   int* yPtr = &y;
-  const char* str = "blah1\n";
-  printf(str);
-  printf("blah2\n");
+  for (int i = 0; i < 3; ++i) {
+    int z = *yPtr + 1;
+    x += z;
+  }
+  randomfcn();
   // temp(&x);
 
   // int in[1000];

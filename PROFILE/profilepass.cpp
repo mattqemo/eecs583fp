@@ -11,8 +11,6 @@
 #include "llvm/IR/Constants.h"
 #include <array>
 
-#include "instructionSets.h"
-
 #include <unordered_map>
 #include <vector>
 #include <type_traits>
@@ -25,19 +23,6 @@ struct InjectInstLog : public ModulePass {
 
   InjectInstLog() : ModulePass(ID) {}
 
-/*
-; Function Attrs: cold noinline nounwind optnone uwtable
-define dso_local void @temp(i8* %ptr) #0 !prof !29 {
-entry:
-  %ptr.addr = alloca i8*, align 8
-  store i8* %ptr, i8** %ptr.addr, align 8
-  %0 = load i8*, i8** %ptr.addr, align 8
-  %call = call i32 (i8*, ...) @printf(i8* getelementptr inbounds ([17 x i8], [17 x i8]* @.str, i64 0, i64 0), i8* %0)
-  ret void
-}
-*/
-
-  // template <typename MEM_INST_TYPE>
   static uint64_t memInstSize(const Instruction* memInst, const DataLayout* dataLayout) {
     if (const auto* loadInst = dyn_cast<LoadInst>(memInst)) {
       return dataLayout->getTypeStoreSize(loadInst->getPointerOperand()->getType()->getPointerElementType());
@@ -47,7 +32,6 @@ entry:
   }
 
   static Value* getPointerValueOfMemInst(Instruction* memInst) {
-    // static_assert(std::is_same_v<MEM_INST_TYPE, LoadInst> || std::is_same_v<MEM_INST_TYPE, StoreInst>, "Mem instructions must be one of LoadInst or StoreInst");
     if (auto* loadInst = dyn_cast<LoadInst>(memInst)) {
       return loadInst->getPointerOperand();
     } else if (auto* storeInst = dyn_cast<StoreInst>(memInst)) {
@@ -76,8 +60,9 @@ entry:
   bool runOnModule(Module &m) override {
     auto* dataLayout = new DataLayout(&m);
     bool changed = false;
-    // auto& loopInfo = getAnalysis<LoopInfoWrapperPass>().getLoopInfo();
-    auto* instLogFunc = m.getFunction("temp");
+    auto* instLogFunc = m.getFunction("_inst_log");
+    assert(instLogFunc && "instLogFunc not found");
+    // errs() << *instLogFunc << "\n";
     size_t instID = 0;
     for (auto& func : m) {
       if (&func == instLogFunc) continue;
