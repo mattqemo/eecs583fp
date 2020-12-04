@@ -57,6 +57,16 @@ struct InjectInstLog : public ModulePass {
     return ConstantExpr::getInBoundsGetElementPtr(strData->getType(), gv, gepIdxArgs);
   }
 
+  /*
+    TODO: Log pointer value after each MEMORY LOCATION initialization
+    MEMORY LOCATION - pointer used by load/store
+    Should be mostly allocas (memory element), some loads (pointer to pointer situation) and some GEP (registers), etc.
+    TODO: figure out how to log global pointers as well
+
+    TODO: emit data as
+    instid
+    addr
+  */
   bool runOnModule(Module &m) override {
     auto* dataLayout = new DataLayout(&m);
     bool changed = false;
@@ -74,7 +84,6 @@ struct InjectInstLog : public ModulePass {
             char memInstType = isa<LoadInst>(inst) ? 'L' : 'S';
 
             changed = true;
-            errs() << "creating callinst\n";
             auto* IDParam = ConstantInt::get(
               instLogFunc->getFunctionType()->getFunctionParamType(0),
               currentInstID);
@@ -102,6 +111,6 @@ struct InjectInstLog : public ModulePass {
 }  // end of anonymous namespace
 
 char InjectInstLog::ID = 0;
-static RegisterPass<InjectInstLog> X("fp", "InjectInstLog Pass",
+static RegisterPass<InjectInstLog> X("fp_profile", "InjectInstLog Pass",
                              false /* Only looks at CFG */,
                              false /* Analysis Pass */);

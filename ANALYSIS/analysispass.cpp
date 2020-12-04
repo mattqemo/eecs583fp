@@ -77,13 +77,50 @@ loop:
 loop:
     %1: load(ptrA);      ptrA==0x2
     doAlias(ptrA, ptrB, i);
-    %2: load(ptrB);      ptrA==0x3
+    %2: load(ptrB);      ptrB==0x3
 loop:
     %1: load(ptrA);      ptrA==0x3
-    %2: load(ptrB);      ptrA==0x4
+    %2: load(ptrB);      ptrB==0x4
 
     %3: ptrC = 0x1
 
+
+ptrA = alloca
+x = alloca
+store(500, %x)
+store(600, %x)
+y = load %x
+
+int y;
+int Y;
+int* yPtr = &y;
+int* yPtr1 = &Y;
+int** yPtrPtr = &yPtr;
+*yPtrPtr = &yPtr1;
+
+
+
+%y = alloca i32, align 4
+(LOG: %y is 0xFFFFF...)
+%yPtr = alloca i32*, align 8
+(LOG: %yPtr is 0xAAAAA...)
+store i32* %y, i32** %yPtr, align 8
+%yPtr2 = alloca i32*, align 8
+
+%yPtrPtr = alloca i32**, align 8
+(LOG: %yPtrPtr is 0xBBBBB...)
+store i32** yPtr2, i32*** yPtrPtr, align 8
+%val = alloca ...
+%temp = load i32* yPtr2
+store temp, val
+
+load(ptrA);      ptrA==0x3
+load(ptrB);      ptrB==0x4
+load(ptrB);      ptrB==0x5
+load(ptrB);      ptrB==0x3
+store(ptrB)
+
+1st key is smallest ptr
 
 fn:
     %1: load(ptrA);      ptrA==0x1
@@ -94,12 +131,6 @@ fn:
     %2: load(ptrB);      ptrA==0x3
 
   */
- // ^ DOESN'T alias
-  /*
-    ptrA = 0x1;
-    ptrB = 0x1;
-  */
- // ^ DOES alias
  /*
   ptrToVal
   valToPtr
@@ -112,8 +143,8 @@ fn:
  */
 
   double getAliasProbability(const MemoryLocation& loc_a, const MemoryLocation& loc_b) {
-    auto keya = getKey(loc_a);
-    auto keyb = getKey(loc_b);
+    // auto keya = getKey(loc_a);
+    // auto keyb = getKey(loc_b);
   }
   void printInsts() {
     for (uint32_t i = 0; i < insts.size(); i++){
@@ -124,6 +155,13 @@ fn:
 };
 
 
+/*
+assume format:
+instID
+addr
+instID
+addr
+*/
 struct InstLogAnalysisWrapperPass : public ModulePass {
   static char ID;
 
@@ -133,6 +171,18 @@ struct InstLogAnalysisWrapperPass : public ModulePass {
     // run thru and do mapping (for bb : for func ...)
     auto* instLogFunc = m.getFunction("_inst_log");
     assert(instLogFunc && "instLogFunc not found");
+
+    for (auto& func : m) {
+      for (auto& bb : func) {
+        for (auto& inst : bb) {
+          if (isa<LoadInst>(inst) or isa<StoreInst>(inst)) {
+            auto memLoc = MemoryLocation::get(&inst);
+            errs() << "memloc for inst " << inst << ": " << *memLoc.Ptr << "\n";
+          }
+        }
+      }
+    }
+    return false;
 
     for (auto& func : m) {
       if (&func == instLogFunc) continue;
@@ -182,6 +232,6 @@ private:
 }  // end of anonymous namespace
 
 char InstLogAnalysisWrapperPass::ID = 0;
-static RegisterPass<InstLogAnalysisWrapperPass> X("fp1", "InstLogAnalysisWrapperPass Pass",
+static RegisterPass<InstLogAnalysisWrapperPass> X("fp_analysis", "InstLogAnalysisWrapperPass Pass",
                              false /* Only looks at CFG */,
                              false /* Analysis Pass */);
