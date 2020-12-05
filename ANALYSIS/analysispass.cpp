@@ -16,6 +16,7 @@
 #include <string>
 #include <map>
 #include <unordered_map>
+#include <unordered_set>
 #include <fstream>
 #include <type_traits>
 
@@ -155,46 +156,115 @@ fn:
 };
 
 
-/*
-assume format:
-instID
-addr
-instID
-addr
-*/
+struct AliasingStats {
+  uint32_t num_collisions;
+  uint32_t num_comparisons;
+
+  AliasingStats() : num_collisions(0), num_comparisons(0) {}
+};
+
+
 struct InstLogAnalysisWrapperPass : public ModulePass {
   static char ID;
+  std::unordered_map<const Value*, uint32_t> memLocPtrToId; // TO EVALUATE: assume here that the Ptr field of MemoryLocation is unique per MemLoc
+  std::unordered_map<uint32_t, MemoryLocation> idToMemLoc;
 
   InstLogAnalysisWrapperPass() : ModulePass(ID) {}
 
-  bool runOnModule(Module &m) override {
-    // run thru and do mapping (for bb : for func ...)
-    auto* instLogFunc = m.getFunction("_inst_log");
-    assert(instLogFunc && "instLogFunc not found");
-
-    for (auto& func : m) {
-      for (auto& bb : func) {
-        for (auto& inst : bb) {
-          if (isa<LoadInst>(inst) or isa<StoreInst>(inst)) {
-            auto memLoc = MemoryLocation::get(&inst);
-            errs() << "memloc for inst " << inst << ": " << *memLoc.Ptr << "\n";
-          }
-        }
-      }
-    }
-    return false;
+  void buildIdToMemLocMapping(Module &m, Function* instLogFunc) {
+    uint32_t currId = 0;
 
     for (auto& func : m) {
       if (&func == instLogFunc) continue;
       for (auto& bb : func) {
         for (auto& inst : bb) {
           if (isa<LoadInst>(inst) or isa<StoreInst>(inst)) {
-            instLogAnalysis.insts.push_back(&inst);
-            // instLogAnalysis.addInst(&inst);
+            auto memLoc = MemoryLocation::get(&inst);
+            if (!memLocPtrToId.count(memLoc.Ptr)) {
+              // errs() << *memLoc.Ptr << ' ' << currId << '\n';
+              memLocPtrToId[memLoc.Ptr] = currId;
+              idToMemLoc[currId] = memLoc;
+              ++currId;
+            }
+            else {
+              // errs() << "already mapped\n";
+            }
           }
         }
       }
     }
+
+    assert(memLocPtrToId.size() == idToMemLoc.size() && "memLocPtrToId and idToMemLoc are different size");
+  }
+
+  std::unordered_map<uint64_t, AliasingStats> parseLogAndComputerAliasingStats() {
+    uint32_t instIdIn;
+    void* memAddrIn_void;
+    std::ifstream ins("../583simple/log.log");
+
+    std::unordered_map<uint32_t, uint64_t> idToShadowPtr;
+    std::unordered_map<uint64_t, AliasingStats> idPairToAliasingStats;
+    while (ins >> instIdIn >> memAddrIn_void) {
+      uint64_t memAddrIn = (uint64_t)memAddrIn_void;
+      assert(idToMemLoc.count(instIdIn));
+      idToShadowPtr[instIdIn] = memAddrIn;
+      errs() << "hi " << memAddrIn_void << ' ' << memAddrIn << '\n';
+
+      /* TOCHECK: only compare against Memlocs that currently have a shadow value */
+      for (auto it_shadow = idToShadowPtr.begin(); it_shadow != idToShadowPtr.end(); ++it_shadow) {
+        errs() << "loop ";
+        uint32_t instIdCompare = it_shadow->first;
+        uint64_t memAddrCompare = it_shadow->second;
+        if (instIdCompare == instIdIn) {
+          continue; // don't compute aliasing stats with itself
+        }
+
+        uint64_t pairKey = getIdPairKey(instIdIn, instIdCompare);
+        idPairToAliasingStats[pairKey].num_comparisons++;
+        if (memAddrIn == memAddrCompare) {
+          idPairToAliasingStats[pairKey].num_collisions++;
+          errs() << "\tCOLLISION DETECTED\n";
+        }
+      }
+
+      // idea: do all pair-wise comparisons using the "shadow" structure holding most recent addresses
+    }
+
+    return idPairToAliasingStats;
+  }
+
+  /* convention is smaller id is left most in the key */
+  uint64_t getIdPairKey(uint32_t id_a, uint32_t id_b) {
+    assert(id_a != id_b && "getIdPairKey called with 2 identical IDs as parameters");
+    if (id_a > id_b) return getIdPairKey(id_b, id_a);
+
+    errs() << "getIdPairKey: " << id_a << ' ' << id_b << ' ' << (id_a << sizeof(uint32_t)) + id_b << '\n';
+ 
+    return (id_a << sizeof(uint32_t)) + id_b;
+  }
+
+  bool runOnModule(Module &m) override {
+    auto* instLogFunc = m.getFunction("_inst_log");
+    assert(instLogFunc && "instLogFunc not found");
+
+    buildIdToMemLocMapping(m, instLogFunc);
+    errs() << "********\nbuilding maps done\n\n";
+
+    std::unordered_map<uint64_t, AliasingStats> idToAliasingStats = parseLogAndComputerAliasingStats();
+
+    errs() << "********\nparsing done \n\n";
+
+    // for (auto& func : m) {
+    //   for (auto& bb : func) {
+    //     for (auto& inst : bb) {
+    //       if (isa<LoadInst>(inst) or isa<StoreInst>(inst)) {
+    //         auto memLoc = MemoryLocation::get(&inst);
+    //         errs() << "memloc for inst " << inst << ": " << *memLoc.Ptr << "\n";
+    //       }
+    //     }
+    //   }
+    // }
+    return false;
 
     instLogAnalysis.printInsts();
 
@@ -203,22 +273,9 @@ struct InstLogAnalysisWrapperPass : public ModulePass {
     Sample line:
       6 (instrID)
       0x7ffda4e5109c (addr)
-      4 (size of pointer)
-      S (store or load)
-      main (function name)
+      12 (instrID)
+      0x7fa344e5112d (addr)
     */
-
-    uint32_t instID;
-    uint64_t memAddr;
-    uint32_t ptrSize;
-    char memType;
-    std::string fcnName;
-    std::ifstream ins("../583simple/log.log");
-
-    while (ins >> instID >> memAddr >> ptrSize >> memType >> fcnName) {
-
-      // develop a list of [start, end] pairing for each pointers accesses
-    }
 
     // get MemoryLocation from Instruction -> https://llvm.org/doxygen/classllvm_1_1MemoryLocation.html#a61dc6d1a1e9c3cb0adb4c791b329ff31
 
