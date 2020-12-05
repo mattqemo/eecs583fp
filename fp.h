@@ -20,9 +20,9 @@
 
 // TODO: parameters for: function name, full instruction name, address, size of op
 // memInstType is either 'S' for stores or 'L' for loads
-void _inst_log(size_t instID, void* addr, size_t size, char memInstType, const char* funcName) {
+void _inst_log(size_t instID, void* addr/*, size_t size, char memInstType, const char* funcName*/) {
     static FILE* instLogFile = NULL;
     if (instLogFile == NULL) instLogFile = fopen("log.log", "w+");
-    fprintf(instLogFile, "%zu\n%p\n%zu\n%c\n%s\n\n", instID, addr, size, memInstType, funcName);
+    fprintf(instLogFile, "%zu\n%p\n"/*"%zu\n%c\n%s\n\n"*/, instID, addr/*, size, memInstType, funcName*/);
 }
 #endif /* _FP_H_ */
