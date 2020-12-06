@@ -2,10 +2,13 @@
 
 #include "../../fp.h"
 
+int global = -1;
+
 void randomfcn() {
   int a = 5;
   a = a;
   int b = a;
+  global = 5;
 }
 
 int main()
@@ -18,6 +21,7 @@ int main()
   *xptrptr = yptr;
   int arr[2];
   arr[0] = 0;
+  global = 10;
   // int x = 10;
   // int y = x;
   // int* yPtr = &y;

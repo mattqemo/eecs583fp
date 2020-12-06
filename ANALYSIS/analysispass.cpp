@@ -20,6 +20,8 @@
 #include <fstream>
 #include <type_traits>
 
+#include "../PROFILE/helpers.hpp"
+
 using namespace llvm;
 
 /*
@@ -144,6 +146,7 @@ fn:
  */
 
   double getAliasProbability(const MemoryLocation& loc_a, const MemoryLocation& loc_b) {
+    return 0.0;
     // auto keya = getKey(loc_a);
     // auto keyb = getKey(loc_b);
   }
@@ -239,7 +242,7 @@ struct InstLogAnalysisWrapperPass : public ModulePass {
     if (id_a > id_b) return getIdPairKey(id_b, id_a);
 
     errs() << "getIdPairKey: " << id_a << ' ' << id_b << ' ' << (id_a << sizeof(uint32_t)) + id_b << '\n';
- 
+
     return (id_a << sizeof(uint32_t)) + id_b;
   }
 
