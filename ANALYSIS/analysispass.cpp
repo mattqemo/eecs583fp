@@ -91,13 +91,12 @@ struct InstLogAnalysisWrapperPass : public ModulePass {
 
   InstLogAnalysisWrapperPass() : ModulePass(ID) {}
 
-  std::unordered_map<size_t, MemoryLocation> getIdToMemLocMapping(Module &m, Function* instLogFunc) const {
+  std::unordered_map<size_t, MemoryLocation> getIdToMemLocMapping(Module &m) const {
     std::unordered_map<size_t, MemoryLocation> ret;
     std::unordered_set<const Value*> visitedPtrs;
     size_t currId = 0;
 
     for (auto& func : m) {
-      if (&func == instLogFunc) continue;
       for (auto& bb : func) {
         for (auto& inst : bb) {
           if (isa<LoadInst>(inst) or isa<StoreInst>(inst)) {
@@ -105,10 +104,6 @@ struct InstLogAnalysisWrapperPass : public ModulePass {
             if (!visitedPtrs.count(memLoc.Ptr)) {
               ret[currId++] = memLoc;
               visitedPtrs.insert(memLoc.Ptr);
-              errs() << "new id: " << currId << '\n';
-            }
-            else {
-              errs() << "already mapped\n";
             }
           }
         }
@@ -148,20 +143,19 @@ struct InstLogAnalysisWrapperPass : public ModulePass {
     return memLocPairToAliasStats;
   }
 
-  void testGetAliasProba(Module& m, Function* instLogFunc, size_t targetId_a, size_t targetId_b) {
+  void testGetAliasProba(Module& m, size_t targetId_a, size_t targetId_b) {
     MemoryLocation memLoc_a, memLoc_b;
     std::unordered_set<const Value*> visitedPtrs;
     size_t currId = 0;
 
     for (auto& func : m) {
-      if (&func == instLogFunc) continue;
       for (auto& bb : func) {
         for (auto& inst : bb) {
           if (isa<LoadInst>(inst) or isa<StoreInst>(inst)) {
             auto memLoc = MemoryLocation::get(&inst);
             if (!visitedPtrs.count(memLoc.Ptr)) {
               if (currId == targetId_a) memLoc_a = memLoc;
-              else if (currId == targetId_b) memLoc_b = memLoc;
+              if (currId == targetId_b) memLoc_b = memLoc;
               ++currId;
               visitedPtrs.insert(memLoc.Ptr);
             }
@@ -176,10 +170,7 @@ struct InstLogAnalysisWrapperPass : public ModulePass {
   }
 
   bool runOnModule(Module &m) override {
-    auto* instLogFunc = m.getFunction("_inst_log");
-    assert(instLogFunc && "instLogFunc not found");
-
-    idToMemLoc = getIdToMemLocMapping(m, instLogFunc);
+    idToMemLoc = getIdToMemLocMapping(m);
     errs() << "********\nbuilding map done\n\n";
 
     std::unordered_map<MemLocPair, AliasStats, hashMemLocPair> memLocPairToAliasStats = parseLogAndGetAliasStats();
@@ -187,9 +178,9 @@ struct InstLogAnalysisWrapperPass : public ModulePass {
 
     InstLogAnalysis::memLocPairToAliasStats = memLocPairToAliasStats;
 
-    testGetAliasProba(m, instLogFunc, 2, 5);
-    testGetAliasProba(m, instLogFunc, 10, 8);
-    testGetAliasProba(m, instLogFunc, 1, 1);
+    testGetAliasProba(m, 2, 5);
+    testGetAliasProba(m, 12, 8);
+    testGetAliasProba(m, 1, 1);
     return false;
   }
 
