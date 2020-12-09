@@ -11,6 +11,8 @@
 #include "llvm/IR/InstrTypes.h"
 #include "llvm/IR/Constants.h"
 
+#include "../ANALYSIS/analysis.cpp"
+
 #include <vector>
 #include <string>
 #include <map>
@@ -148,115 +150,90 @@ https://stackoverflow.com/questions/10990018/how-to-generate-assembly-code-with-
 
 namespace {
 
-struct InstLogAnalysisWrapperPass : public ModulePass {
+struct OptOnAliasProfilePass : public ModulePass {
   static char ID;
-  std::unordered_map<size_t, MemoryLocation> idToMemLoc;
 
-  InstLogAnalysisWrapperPass() : ModulePass(ID) {}
-
-  std::unordered_map<size_t, MemoryLocation> getIdToMemLocMapping(Module &m) const {
-    std::unordered_map<size_t, MemoryLocation> ret;
-    std::unordered_set<const Value*> visitedPtrs;
-    size_t currId = 0;
-
-    for (auto& func : m) {
-      for (auto& bb : func) {
-        for (auto& inst : bb) {
-          if (isa<LoadInst>(inst) or isa<StoreInst>(inst)) {
-            auto memLoc = MemoryLocation::get(&inst);
-            if (!visitedPtrs.count(memLoc.Ptr)) {
-              ret[currId++] = memLoc;
-              visitedPtrs.insert(memLoc.Ptr);
-            }
-          }
-        }
-      }
-    }
-    return ret;
+  void getAnalysisUsage(AnalysisUsage& AU) const {
+    AU.addRequired<InstLogAnalysisWrapperPass>();
   }
 
-  std::unordered_map<MemLocPair, AliasStats, hashMemLocPair> parseLogAndGetAliasStats() const {
-    std::unordered_map<size_t, uint64_t> idToShadowValue;
-    std::unordered_map<MemLocPair, AliasStats, hashMemLocPair> memLocPairToAliasStats;
+  bool areFunctionCallsIdentical(const InstLogAnalysis& instLogAnalysis, CallBase* call1, CallBase* call2){
+    assert(call1->getCalledFunction() == call2->getCalledFunction());
+    assert(call1->arg_size() == call2->arg_size());
 
-    size_t instIdIn;
-    void* memAddrIn_void; // TODO: change to uint64_t directly?
-    std::ifstream ins("../583simple/log.log");
-    while (ins >> instIdIn >> memAddrIn_void) {
-      auto memLocIn = idToMemLoc.at(instIdIn);
-      uint64_t memAddrIn = (uint64_t)memAddrIn_void;
-      idToShadowValue[instIdIn] = memAddrIn;
-
-      for (auto it_shadow = idToShadowValue.begin(); it_shadow != idToShadowValue.end(); ++it_shadow) {
-        auto memLocCompare = idToMemLoc.at(it_shadow->first);
-        uint64_t memAddrCompare = it_shadow->second;
-
-        if (memLocCompare.Ptr != memLocIn.Ptr) { // don't compute aliasing stats with itself
-          auto& pairAliasStats = memLocPairToAliasStats[{memLocIn, memLocCompare}];
-          pairAliasStats.num_comparisons++;
-          if (memAddrIn == memAddrCompare) {
-            pairAliasStats.num_collisions++;
-            errs() << "\tCOLLISION DETECTED\n";
-          }
-        }
+    for (auto it1 = call1->arg_begin(), it2 = call2->arg_begin(); it1 != call1->arg_end(); ++it1, ++it2) {
+      // if (arg is Ptr) {
+      //   memLoc from ptr
+      //   getProba(ptr1, ptr2)
+      // }
+      auto* use1 = *it1, use2 = *it2;
+      if (dyn_cast<MemoryLocation>(use1)) { // test this idea
+        errs() << "casting worked\n";
+        auto* memLoc1 = dyn_cast<MemoryLocation>(use1);
+        auto* memLoc2 = dyn_cast<MemoryLocation>(use2);
+        double probAlias = instLogAnalysis.getAliasProbability(memLoc1, memLoc2);
       }
+
+      else if (use1->get() != use2->get()) { //compare their Value*
+        // (use1->getUser() != use2->getUser())
+        return false; //??
+      }
+
+
+
     }
 
-    return memLocPairToAliasStats;
-  }
-
-  void testGetAliasProba(Module& m, size_t targetId_a, size_t targetId_b) {
-    MemoryLocation memLoc_a, memLoc_b;
-    std::unordered_set<const Value*> visitedPtrs;
-    size_t currId = 0;
-
-    for (auto& func : m) {
-      for (auto& bb : func) {
-        for (auto& inst : bb) {
-          if (isa<LoadInst>(inst) or isa<StoreInst>(inst)) {
-            auto memLoc = MemoryLocation::get(&inst);
-            if (!visitedPtrs.count(memLoc.Ptr)) {
-              if (currId == targetId_a) memLoc_a = memLoc;
-              if (currId == targetId_b) memLoc_b = memLoc;
-              ++currId;
-              visitedPtrs.insert(memLoc.Ptr);
-            }
-          }
-        }
-      }
-    }
-
-
-    double aliasProba = instLogAnalysis.getAliasProbability(memLoc_a, memLoc_b);
-    errs() << "AliasProba between ID " << targetId_a << " and ID " << targetId_b << " is " << aliasProba << '\n';
-  }
-
-  bool runOnModule(Module &m) override {
-    // TODO: use morgans function and flip
-    idToMemLoc = getIdToMemLocMapping(m);
-    errs() << "********\nbuilding map done\n\n";
-
-    std::unordered_map<MemLocPair, AliasStats, hashMemLocPair> memLocPairToAliasStats = parseLogAndGetAliasStats();
-    errs() << "********\nparsing done \n\n";
-
-    instLogAnalysis.memLocPairToAliasStats = memLocPairToAliasStats;
-
-    testGetAliasProba(m, 2, 5);
-    testGetAliasProba(m, 12, 8);
-    testGetAliasProba(m, 1, 1);
     return false;
   }
 
-  InstLogAnalysis& getInstLogAnalysis() { return instLogAnalysis; }
+  /* example:
+    // main()
+    //  int val1 = 5;
+    //  int val2 = 6;
+    //   fn(val1, ptrA);
+    //    --> fn(val1, ptrB);
+    //   fn(val2, ptrB);
+  */
+  /* do actual optimizations */
+  bool handleFunction(const InstLogAnalysis& instLogAnalysis, Function* f) {
+    if (!f->getName().contains("_PURE_")) return false;
+    std::unordered_map<Function*, std::vector<CallBase*>> prevFunctionCalls;
+    for (auto& bb : f) {
+      for (auto& inst : bb) {
+        if (auto* currCall = dyn_cast<CallBase>(inst)) {
+          auto* fCalled = currCall->getCalledFunction();
+          if (prevFunctionCalls.count(fCalled)){
+            // check for probable aliasing that meets our threshold
+            auto& prevCallsVec = prevFunctionCalls[fCalled];
+            for (auto* prevCall : prevCallsVec) {
+              if (areFunctionCallsIdentical(instLogAnalysis, currCall, prevCall)) {
+                // do smth idkkkk
+                 // cleanup code for if we're wrong
+              }
+            }
 
-private:
-  InstLogAnalysis instLogAnalysis;
+          }
+        }
+      }
+    }
+  }
 
-}; // end of struct InstLogAnalysisWrapperPass
+  bool runOnModule(Module &m) override {
+    bool changed = false;
+
+    auto& instLogAnalysis = getAnalysis<InstLogAnalysisWrapperPass>().getInstLogAnalysis();
+
+    for (auto& f : m) {
+      changed |= handleFunction(instLogAnalysis, f);
+    }
+
+    return changed;
+  }
+}; // end of struct OptOnAliasProfilePass
 }  // end of anonymous namespace
 
-char InstLogAnalysisWrapperPass::ID = 0;
-static RegisterPass<InstLogAnalysisWrapperPass> X("fp_analysis", "InstLogAnalysisWrapperPass Pass",
+char OptOnAliasProfilePass::ID = 0;
+static RegisterPass<OptOnAliasProfilePass> X("fp_optimization", "OptOnAliasProfilePass Pass",
                              false /* Only looks at CFG */,
                              false /* Analysis Pass */);
 

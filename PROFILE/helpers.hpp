@@ -3,21 +3,27 @@
 
 #include "llvm/IR/Function.h"
 #include "llvm/Support/raw_ostream.h"
+#include <unordered_map>
 
 using namespace llvm;
 
+template <>
+struct std::hash<MemoryLocation> {
+  using hash_type_t = std::hash<const llvm::Value*>;
+  std::size_t operator()(const MemoryLocation& memLoc) const noexcept { return hash_type_t{}(memLoc.Ptr); }
+};
+
 // Return a map where the keys are every pointer ever loaded/stored in the program,
 // and the values are an id assigned by the order in which the pointers are referenced
-llvm::DenseMap<Value*, size_t> getMemLocPtrToId(Module& m) {
-  llvm::DenseMap<Value*, size_t> ret;
+std::unordered_map<MemoryLocation, size_t> getMemLocToId(Module& m) {
+  auto ret = std::unordered_map<MemoryLocation, size_t>{};
   size_t id = 0;
   for (auto& func : m) {
     for (auto& bb : func) {
       for (auto& inst : bb) {
-        if (auto* loadInst = dyn_cast<LoadInst>(&inst)) {
-          if (ret.find(loadInst->getPointerOperand()) == ret.end()) ret[loadInst->getPointerOperand()] = id++;
-        } else if (auto* storeInst = dyn_cast<StoreInst>(&inst)) {
-          if (ret.find(storeInst->getPointerOperand()) == ret.end()) ret[storeInst->getPointerOperand()] = id++;
+        if (auto memLocOpt = MemoryLocation::getOrNone(&inst); memLocOpt.hasValue() && !ret.count(memLocOpt.getValue())) {
+          errs() << "memLoc added with value of " << *memLocOpt.getValue().Ptr << "\n";
+          ret[memLocOpt.getValue()] = id++;
         }
       }
     }

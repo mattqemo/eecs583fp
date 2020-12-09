@@ -11,17 +11,31 @@ void randomfcn() {
   global = 5;
 }
 
+void pureFunc(int *a) {
+  global = *a;
+}
+
 int main()
 {
-  int x = 10;
-  int* xptr = &x;
-  int** xptrptr = &xptr;
-  int y = 15;
-  int* yptr = &y;
-  *xptrptr = yptr;
-  int arr[2];
-  arr[0] = 0;
-  global = 10;
+  int val1 = 5;
+  int val2 = 6;
+  pureFunc(&val1);
+  pureFunc(&val1);
+  pureFunc(&val2);
+  // try {
+  //   randomfcn();
+  // } catch(...) {}
+  // int x = 0;
+  // int y = x;
+  // int x = 10;
+  // int* xptr = &x;
+  // int** xptrptr = &xptr;
+  // int y = 15;
+  // int* yptr = &y;
+  // *xptrptr = yptr;
+  // int arr[2];
+  // arr[0] = 0;
+  // global = 10;
   // int x = 10;
   // int y = x;
   // int* yPtr = &y;

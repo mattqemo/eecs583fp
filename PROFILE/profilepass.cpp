@@ -15,6 +15,8 @@
 
 using namespace llvm;
 
+/* TODO: replace CallInst with CallBase so exceptions can be thrown */
+
 namespace {
 struct InjectInstLog : public ModulePass {
   static char ID;
@@ -43,27 +45,27 @@ struct InjectInstLog : public ModulePass {
     assert(mainFunc && "mainFunc not found");
     auto* dataLayout = new DataLayout(&m);
     bool changed = false;
-    auto ptrsToLog = getMemLocPtrToId(m);
+    auto ptrsToLog = getMemLocToId(m);
     for (auto& func : m) {
-      if (&func == instLogFunc) continue;
       for (auto& bb : func) {
         for (auto& inst : bb) {
-          if (ptrsToLog.count(&inst)) {
-            injectInstLogAfter(&inst, ptrsToLog[&inst], &inst);
+          if (auto memLocOpt = MemoryLocation::getOrNone(&inst); memLocOpt.hasValue() && ptrsToLog.count(memLocOpt.getValue())) {
+            // TODO: atone for const_cast sins
+            auto* memLocPtr = const_cast<Value*>(memLocOpt.getValue().Ptr);
+            auto memLocId = ptrsToLog[memLocOpt.getValue()];
+            ptrsToLog.erase(memLocOpt.getValue());
+            if (auto* memLocInst = dyn_cast<Instruction>(memLocPtr)) {
+              if (memLocInst->getFunction() == instLogFunc) continue; // Do not inject logging into instlogfunc - unnecessary and will cause infinite recursion
+              injectInstLogAfter(memLocInst, memLocId, memLocPtr);
+            } else {
+              injectInstLogAfter(&mainFunc->getEntryBlock().front(), memLocId, memLocPtr);
+            }
             changed = true;
-            ptrsToLog.erase(&inst);
           }
         }
       }
     }
-    if (!ptrsToLog.empty()) {
-      for (auto& [ptr, id] : ptrsToLog) {
-        if (auto* inst = dyn_cast<Instruction>(ptr); inst && inst->getFunction() == instLogFunc) continue;
-        changed = true;
-        injectInstLogAfter(&mainFunc->getEntryBlock().front(), id, ptr);
-      }
-      ptrsToLog.clear();
-    }
+    assert(ptrsToLog.empty() && "Did not inject logging for every memory location!");
     return changed;
   }
 

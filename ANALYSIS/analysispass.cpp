@@ -19,6 +19,8 @@
 #include <fstream>
 #include <utility>
 
+#include "../PROFILE/helpers.hpp"
+
 using namespace llvm;
 
 /*
@@ -67,24 +69,12 @@ struct InstLogAnalysisWrapperPass : public ModulePass {
   InstLogAnalysisWrapperPass() : ModulePass(ID) {}
 
   std::unordered_map<size_t, MemoryLocation> getIdToMemLocMapping(Module &m) const {
-    std::unordered_map<size_t, MemoryLocation> ret;
-    std::unordered_set<const Value*> visitedPtrs;
-    size_t currId = 0;
-
-    for (auto& func : m) {
-      for (auto& bb : func) {
-        for (auto& inst : bb) {
-          if (isa<LoadInst>(inst) or isa<StoreInst>(inst)) {
-            auto memLoc = MemoryLocation::get(&inst);
-            if (!visitedPtrs.count(memLoc.Ptr)) {
-              ret[currId++] = memLoc;
-              visitedPtrs.insert(memLoc.Ptr);
-            }
-          }
-        }
-      }
+    std::unordered_map<MemoryLocation, size_t> memLocToId = getMemLocToId(m);
+    std::unordered_map<size_t, MemoryLocation> idToMemLoc;
+    for (auto& [memLoc, Id] : memLocToId) {
+      idToMemLoc[Id] = memLoc;
     }
-    return ret;
+    return idToMemLoc;
   }
 
   std::unordered_map<MemLocPair, AliasStats, hashMemLocPair> parseLogAndGetAliasStats() const {
