@@ -92,7 +92,7 @@ rebuild_cache/fast: rebuild_cache
 
 # Special rule for the target list_install_components
 list_install_components:
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "Available install components are: \"ANALYSIS\" \"PROFILE\""
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "Available install components are: \"ANALYSIS\" \"OPTIM\" \"PROFILE\""
 .PHONY : list_install_components
 
 # Special rule for the target list_install_components
@@ -247,6 +247,45 @@ ANALYSIS/fast:
 	$(MAKE) -f ANALYSIS/CMakeFiles/ANALYSIS.dir/build.make ANALYSIS/CMakeFiles/ANALYSIS.dir/build
 .PHONY : ANALYSIS/fast
 
+#=============================================================================
+# Target rules for targets named install-OPTIM-stripped
+
+# Build rule for target.
+install-OPTIM-stripped: cmake_check_build_system
+	$(MAKE) -f CMakeFiles/Makefile2 install-OPTIM-stripped
+.PHONY : install-OPTIM-stripped
+
+# fast build rule for target.
+install-OPTIM-stripped/fast:
+	$(MAKE) -f OPTIM/CMakeFiles/install-OPTIM-stripped.dir/build.make OPTIM/CMakeFiles/install-OPTIM-stripped.dir/build
+.PHONY : install-OPTIM-stripped/fast
+
+#=============================================================================
+# Target rules for targets named OPTIM
+
+# Build rule for target.
+OPTIM: cmake_check_build_system
+	$(MAKE) -f CMakeFiles/Makefile2 OPTIM
+.PHONY : OPTIM
+
+# fast build rule for target.
+OPTIM/fast:
+	$(MAKE) -f OPTIM/CMakeFiles/OPTIM.dir/build.make OPTIM/CMakeFiles/OPTIM.dir/build
+.PHONY : OPTIM/fast
+
+#=============================================================================
+# Target rules for targets named install-OPTIM
+
+# Build rule for target.
+install-OPTIM: cmake_check_build_system
+	$(MAKE) -f CMakeFiles/Makefile2 install-OPTIM
+.PHONY : install-OPTIM
+
+# fast build rule for target.
+install-OPTIM/fast:
+	$(MAKE) -f OPTIM/CMakeFiles/install-OPTIM.dir/build.make OPTIM/CMakeFiles/install-OPTIM.dir/build
+.PHONY : install-OPTIM/fast
+
 # Help Target
 help:
 	@echo "The following are some of the valid targets for this Makefile:"
@@ -266,6 +305,9 @@ help:
 	@echo "... install-ANALYSIS"
 	@echo "... install-ANALYSIS-stripped"
 	@echo "... ANALYSIS"
+	@echo "... install-OPTIM-stripped"
+	@echo "... OPTIM"
+	@echo "... install-OPTIM"
 .PHONY : help
 
 

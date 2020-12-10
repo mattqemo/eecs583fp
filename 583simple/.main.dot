@@ -1,5 +1,11 @@
 digraph "CFG for 'main' function" {
 	label="CFG for 'main' function";
 
-	Node0x55dbbe2c3560 [shape=record,label="{entry:\l  %retval = alloca i32, align 4\l  %0 = bitcast i32* %retval to i8*\l  call void @_inst_log(i64 7, i8* %0)\l  %1 = bitcast i32* @global to i8*\l  call void @_inst_log(i64 5, i8* %1)\l  %2 = bitcast %struct._IO_FILE** @_inst_log.instLogFile to i8*\l  call void @_inst_log(i64 2, i8* %2)\l  store i32 0, i32* %retval, align 4\l  call void @pureFunc(i32 5)\l  call void @pureFunc(i32 5)\l  call void @pureFunc(i32 6)\l  ret i32 1\l}"];
+	Node0x5641cdaa7da0 [shape=record,label="{entry:\l  %retval = alloca i32, align 4\l  %val1 = alloca i32, align 4\l  %val2 = alloca i32, align 4\l  store i32 0, i32* %retval, align 4\l  store i32 5, i32* %val1, align 4\l  store i32 6, i32* %val2, align 4\l  call void @other_PURE_(i32* %val1, i32* %val2)\l  call void @other_PURE_(i32* %val1, i32* %val2)\l  %0 = icmp ne i32* %val1, %val1\l  %1 = icmp ne i32* %val2, %val2\l  %2 = and i1 %1, %0\l  br label %3\l}"];
+	Node0x5641cdaa7da0 -> Node0x5641cdaa7f70;
+	Node0x5641cdaa7f70 [shape=record,label="{%3:\l3:                                                \l  call void @pureFunc_PURE_(i32* %val1)\l  call void @pureFunc_PURE_(i32* %val1)\l  %4 = icmp ne i32* %val1, %val1\l  br label %5\l}"];
+	Node0x5641cdaa7f70 -> Node0x5641cdaa7fc0;
+	Node0x5641cdaa7fc0 [shape=record,label="{%5:\l5:                                                \l  call void @pureFunc_PURE_(i32* %val1)\l  %6 = icmp ne i32* %val1, %val1\l  br label %7\l}"];
+	Node0x5641cdaa7fc0 -> Node0x5641cdaa8010;
+	Node0x5641cdaa8010 [shape=record,label="{%7:\l7:                                                \l  call void @pureFunc_PURE_(i32* %val2)\l  ret i32 1\l}"];
 }

@@ -29,7 +29,7 @@ running BEFORE our last pass.
 TODO: Allow running this pass with requireAnalysis<> or something (whatever it's called)
 */
 
-namespace {
+namespace fp583 {
 typedef std::pair<MemoryLocation, MemoryLocation> MemLocPair;
 
 struct hashMemLocPair {
@@ -49,7 +49,7 @@ struct AliasStats {
 struct InstLogAnalysis {
   std::unordered_map<MemLocPair, AliasStats, hashMemLocPair> memLocPairToAliasStats;
 
-  double getAliasProbability(const MemoryLocation& loc_a, const MemoryLocation& loc_b) {
+  double getAliasProbability(const MemoryLocation& loc_a, const MemoryLocation& loc_b) const {
     if (loc_a.Ptr == loc_b.Ptr) {
       return 1.0;
     }
@@ -98,7 +98,7 @@ struct InstLogAnalysisWrapperPass : public ModulePass {
           pairAliasStats.num_comparisons++;
           if (memAddrIn == memAddrCompare) {
             pairAliasStats.num_collisions++;
-            errs() << "\tCOLLISION DETECTED\n";
+            // errs() << "\tCOLLISION DETECTED\n";
           }
         }
       }
@@ -136,16 +136,14 @@ struct InstLogAnalysisWrapperPass : public ModulePass {
   bool runOnModule(Module &m) override {
     // TODO: use morgans function and flip
     idToMemLoc = getIdToMemLocMapping(m);
-    errs() << "********\nbuilding map done\n\n";
 
     std::unordered_map<MemLocPair, AliasStats, hashMemLocPair> memLocPairToAliasStats = parseLogAndGetAliasStats();
-    errs() << "********\nparsing done \n\n";
 
     instLogAnalysis.memLocPairToAliasStats = memLocPairToAliasStats;
 
-    testGetAliasProba(m, 2, 5);
-    testGetAliasProba(m, 12, 8);
-    testGetAliasProba(m, 1, 1);
+    // testGetAliasProba(m, 2, 5);
+    // testGetAliasProba(m, 12, 8);
+    // testGetAliasProba(m, 1, 1);
     return false;
   }
 
@@ -157,8 +155,8 @@ private:
 }; // end of struct InstLogAnalysisWrapperPass
 }  // end of anonymous namespace
 
-char InstLogAnalysisWrapperPass::ID = 0;
-static RegisterPass<InstLogAnalysisWrapperPass> X("fp_analysis", "InstLogAnalysisWrapperPass Pass",
+char fp583::InstLogAnalysisWrapperPass::ID = 0;
+static RegisterPass<fp583::InstLogAnalysisWrapperPass> X("fp_analysis", "InstLogAnalysisWrapperPass Pass",
                              false /* Only looks at CFG */,
                              false /* Analysis Pass */);
 

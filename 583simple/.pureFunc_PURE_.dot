@@ -1,0 +1,5 @@
+digraph "CFG for 'pureFunc_PURE_' function" {
+	label="CFG for 'pureFunc_PURE_' function";
+
+	Node0x5641cdaa6f80 [shape=record,label="{entry:\l  %a.addr = alloca i32*, align 8\l  store i32* %a, i32** %a.addr, align 8\l  %0 = load i32*, i32** %a.addr, align 8\l  %1 = load i32, i32* %0, align 4\l  store i32 %1, i32* @global, align 4\l  ret void\l}"];
+}

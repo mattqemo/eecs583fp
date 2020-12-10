@@ -7,3 +7,4 @@ add_definitions(${LLVM_DEFINITIONS})                      # You don't need to ch
 include_directories(${LLVM_INCLUDE_DIRS})                 # You don't need to change ${LLVM_INCLUDE_DIRS} since it is already defined.
 add_subdirectory(PROFILE)                                  # Add the directory which your pass lives.
 add_subdirectory(ANALYSIS)                                  # Add the directory which your pass lives.
+add_subdirectory(OPTIM)

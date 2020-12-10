@@ -11,17 +11,27 @@ void randomfcn() {
   global = 5;
 }
 
-void pureFunc(int *a) {
+void pureFunc_PURE_(int *a) {
   global = *a;
+}
+
+void other_PURE_(int *a, int* b) {
+  global = *a;
+  global = *b;
 }
 
 int main()
 {
   int val1 = 5;
   int val2 = 6;
-  pureFunc(&val1);
-  pureFunc(&val1);
-  pureFunc(&val2);
+
+  other_PURE_(&val1, &val2);
+  other_PURE_(&val1, &val2);
+
+  pureFunc_PURE_(&val1);
+  pureFunc_PURE_(&val1);
+  pureFunc_PURE_(&val1);
+  pureFunc_PURE_(&val2);
   // try {
   //   randomfcn();
   // } catch(...) {}
