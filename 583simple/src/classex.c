@@ -1,19 +1,18 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <math.h>
 #include "../../fp.h"
 
-struct Num {
+typedef struct Num {
     int* valPtr;
-    bool isInf;
-};
+    int isInf;
+} Num_t;
 
-void ConstructNum(Num* self, int* valPtr_in) {
+void ConstructNum(Num_t* self, int* valPtr_in) {
     self->valPtr = valPtr_in;
 }
 
-double fn_PURE_(Num* n) {
-    return sqrt(*n->valPtr);
+double fn_PURE_(Num_t* n) {
+    return *n->valPtr * *n->valPtr;
 }
 
 int main(int argc, char* argv[]) {
@@ -21,14 +20,14 @@ int main(int argc, char* argv[]) {
   int* valPtr = (int *)malloc(sizeof(int));
   *valPtr = val;
 
-  Num* a = (Num *)malloc(sizeof(Num));
-  Num* b = (Num *)malloc(sizeof(Num));
+  Num_t* a = (Num_t *)malloc(sizeof(Num_t));
+  Num_t* b = (Num_t *)malloc(sizeof(Num_t));
   ConstructNum(a, valPtr);
-  a->isInf = false;
+  a->isInf = 0;
   ConstructNum(b, valPtr);
 
-  double res_a = fn(a);
-  double res_b = fn(b);
+  double res_a = fn_PURE_(a);
+  double res_b = fn_PURE_(b);
 
   printf("results are: %f %f \n", res_a, res_b);
 

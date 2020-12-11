@@ -168,28 +168,48 @@ struct OptimOnAliasProfilePass : public ModulePass {
     return f->getName().contains("_PURE_");
   }
 
-  void removeFunctionCallAndFixUp(CallBase* currCall, CallBase* prevCall, const std::vector<std::pair<Value*, Value*>>& ptrArgsVals) {
-    auto* currBB = currCall->getParent();
-    // auto* followingBB = currBB->splitBasicBlock(currCall);
-    auto* followingBB = currBB->splitBasicBlock(currCall->getNextNode()); // use ^ (this is necessary right now so it doesnt loop forever tho)
 
+  Instruction* generateFixUpICmp(CallBase* ogCall, const std::vector<std::pair<Value*, Value*>>& ptrArgsVals) {
     Instruction* lastComp = nullptr;
     for (auto& [val1, val2] : ptrArgsVals) {
-      auto* valComp = new ICmpInst(currBB->getTerminator(), ICmpInst::ICMP_NE, val1, val2);
+      auto* valComp = new ICmpInst(ogCall, ICmpInst::ICMP_NE, val1, val2);
       if (lastComp) {
-        lastComp = BinaryOperator::CreateAnd(valComp, lastComp);
-        lastComp->insertBefore(currBB->getTerminator());
+        lastComp = BinaryOperator::CreateOr(valComp, lastComp);
+        lastComp->insertBefore(ogCall);
       }
       else {
         lastComp = valComp;
       }
     }
+    assert(lastComp);
+    return lastComp;
+  }
 
-    /** FIXUP
-     * for ALL pointer arguments:
-     *  check if they're NOT equal with if branch
-     *  if so -> do function call and store results
-     **/
+  /* returns fixUpBB so we can exclude it from our optimization pass (would loop forever otherwise) */
+  BasicBlock* removeFunctionCallAndFixUp(CallBase* ogCall, CallBase* prevCall, const std::vector<std::pair<Value*, Value*>>& ptrArgsVals) {
+    Instruction* lastComp = generateFixUpICmp(ogCall, ptrArgsVals);
+
+    auto* currBB = ogCall->getParent();
+    auto* followingBB = currBB->splitBasicBlock(ogCall);
+    currBB->getInstList().back().eraseFromParent(); // erase unconditional branch added by splitBasicBlock
+
+    auto* f = currBB->getParent();
+    auto* fixUpBB = BasicBlock::Create(f->getContext(), "", f);
+    auto* condCheckToFixUpBranch = BranchInst::Create(fixUpBB, followingBB, lastComp, currBB);
+    auto* fixUpEndBranch = BranchInst::Create(followingBB, fixUpBB);
+
+    auto* callInFixUp = ogCall->clone();
+    callInFixUp->insertBefore(fixUpBB->getTerminator());
+
+    if (!ogCall->getType()->isVoidTy()) {
+      auto* phiNode = PHINode::Create(ogCall->getType(), 2, "", ogCall);
+      phiNode->addIncoming(prevCall, currBB);
+      phiNode->addIncoming(callInFixUp, fixUpBB);
+      ogCall->replaceAllUsesWith(phiNode);
+    }
+
+    ogCall->eraseFromParent();
+    return fixUpBB;
   }
 
   /* example:
@@ -202,12 +222,23 @@ struct OptimOnAliasProfilePass : public ModulePass {
   */
   /* do actual optimizations */
   bool handleFunction(const fp583::InstLogAnalysis& instLogAnalysis, Function& f) {
-    std::unordered_map<Function*, std::vector<CallBase*>> prevFunctionCalls;
     bool changed = false;
+    std::unordered_map<Function*, std::vector<CallBase*>> prevFunctionCalls;
+    std::unordered_set<BasicBlock*> fixUpBBs; /* We need to avoid fixUpBBs we introduce as
+    they contain calls that can be optimized (otherwise they wouldn't be in fixUp) and if we don't avoid
+    them, our loop over BBs goes forever */
 
     for (auto& bb : f) {
-      for (auto& inst : bb) {
-        if (auto* currCall = dyn_cast<CallBase>(&inst)) {
+      if (fixUpBBs.count(&bb)) {
+        fixUpBBs.erase(&bb);
+        continue;
+      }
+
+      auto* nextInst = &bb.getInstList().front();
+      while (auto* inst = nextInst) {
+        nextInst = inst->getNextNode();
+
+        if (auto* currCall = dyn_cast<CallBase>(inst)) {
           auto* fCalled = currCall->getCalledFunction();
           if (!isFunctionPure(fCalled)) continue;
 
@@ -216,9 +247,12 @@ struct OptimOnAliasProfilePass : public ModulePass {
             auto& prevCallsVec = prevFunctionCalls[fCalled];
             for (auto* prevCall : prevCallsVec) {
               std::vector<std::pair<Value*, Value*>> ptrArgsVals;
-              if (areFunctionCallsIdentical(instLogAnalysis, currCall, prevCall, ptrArgsVals)) {
+
+              // check !ptrArgsVals.empty() to limit scope to only calls with ptr input
+              if (areFunctionCallsIdentical(instLogAnalysis, currCall, prevCall, ptrArgsVals) && !ptrArgsVals.empty()) {
                 errs() << "optim function call: " << fCalled->getName() << "\n";
-                removeFunctionCallAndFixUp(currCall, prevCall, ptrArgsVals);
+                auto* fixUpBB = removeFunctionCallAndFixUp(currCall, prevCall, ptrArgsVals);
+                fixUpBBs.insert(fixUpBB);
                 changed = true;
                 callNotDeleted = false;
                 break;
@@ -226,12 +260,12 @@ struct OptimOnAliasProfilePass : public ModulePass {
             }
           }
           
-          if (callNotDeleted) {
-            prevFunctionCalls[fCalled].push_back(currCall);
-          }
+          if (callNotDeleted) prevFunctionCalls[fCalled].push_back(currCall);
+          else break;
         }
       }
     }
+
     return changed;
   }
 

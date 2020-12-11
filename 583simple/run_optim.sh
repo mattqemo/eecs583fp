@@ -7,14 +7,17 @@
 
 PATH_MYPASS=~/eecs583fp/build/OPTIM/OPTIM.so ### Action Required: Specify the path to your pass ###
 NAME_MYPASS=-fp_optim ### Action Required: Specify the name for your pass ###
-BENCH=src/simple.c
+BENCH_NAME=${1}
+BENCH=src/${BENCH_NAME}.c
 
+
+./run_profile.sh ${BENCH}
 
 # # Prepare input to run
 # setup
 # # Convert source code to bitcode (IR)
 # # This approach has an issue with -O2, so we are going to stick with default optimization level (-O0)
-clang -emit-llvm -c ${BENCH} -o simple.bc
+clang -emit-llvm -c ${BENCH} -o simple.bc # need -lm for sqrt()
 # # Instrument profiler
 # opt -pgo-instr-gen -instrprof simple.bc -o simple.prof.bc
 # # Generate binary executable with profiler embedded
@@ -29,4 +32,5 @@ clang -emit-llvm -c ${BENCH} -o simple.bc
 # Apply your pass to bitcode (IR)
 opt -load ${PATH_MYPASS} ${NAME_MYPASS} < simple.bc > simple.opt.bc
 
-clang simple.opt.bc && ./a.out
+clang simple.opt.bc
+./a.out

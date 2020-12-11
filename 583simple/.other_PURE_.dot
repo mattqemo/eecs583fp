@@ -1,5 +1,5 @@
 digraph "CFG for 'other_PURE_' function" {
 	label="CFG for 'other_PURE_' function";
 
-	Node0x5641cdaa7730 [shape=record,label="{entry:\l  %a.addr = alloca i32*, align 8\l  %b.addr = alloca i32*, align 8\l  store i32* %a, i32** %a.addr, align 8\l  store i32* %b, i32** %b.addr, align 8\l  %0 = load i32*, i32** %a.addr, align 8\l  %1 = load i32, i32* %0, align 4\l  store i32 %1, i32* @global, align 4\l  %2 = load i32*, i32** %b.addr, align 8\l  %3 = load i32, i32* %2, align 4\l  store i32 %3, i32* @global, align 4\l  ret void\l}"];
+	Node0x55b8c4fe2780 [shape=record,label="{entry:\l  %a.addr = alloca i32*, align 8\l  %b.addr = alloca i32*, align 8\l  store i32* %a, i32** %a.addr, align 8\l  store i32* %b, i32** %b.addr, align 8\l  %0 = load i32*, i32** %a.addr, align 8\l  %1 = load i32, i32* %0, align 4\l  store i32 %1, i32* @global, align 4\l  %2 = load i32*, i32** %b.addr, align 8\l  %3 = load i32, i32* %2, align 4\l  store i32 %3, i32* @global, align 4\l  ret double 2.000000e+00\l}"];
 }
