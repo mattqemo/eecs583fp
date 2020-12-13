@@ -4,6 +4,7 @@
 #include "llvm/IR/Function.h"
 #include "llvm/Support/raw_ostream.h"
 #include <unordered_map>
+#include <unordered_set>
 
 using namespace llvm;
 
@@ -17,16 +18,21 @@ struct std::hash<MemoryLocation> {
 // and the values are an id assigned by the order in which the pointers are referenced
 std::unordered_map<MemoryLocation, size_t> getMemLocToId(Module& m) {
   auto ret = std::unordered_map<MemoryLocation, size_t>{};
+  auto allocaMemLocs = std::unordered_set<MemoryLocation>{};
+
   size_t id = 0;
   for (auto& func : m) {
     for (auto& bb : func) {
       for (auto& inst : bb) {
-        if (auto memLocOpt = MemoryLocation::getOrNone(&inst); memLocOpt.hasValue() && !ret.count(memLocOpt.getValue())) {
-          // if (isa<LoadInst>(inst)) {
-          //   errs() << inst << '\n';
-          // }
-          // errs() << "memLoc added with value of " << *memLocOpt.getValue().Ptr << ' ' << inst << "\n";
-          ret[memLocOpt.getValue()] = id++;
+        if (auto memLocOpt = MemoryLocation::getOrNone(&inst); memLocOpt.hasValue()) {
+          if (!ret.count(memLocOpt.getValue())) {
+            ret[memLocOpt.getValue()] = id++;
+            allocaMemLocs.insert(memLocOpt.getValue());
+          }
+          // adds loads of pointers (we check they load pointers with the 2nd condition)
+          if (isa<LoadInst>(&inst) && inst.getType()->isPtrOrPtrVectorTy() && allocaMemLocs.count(memLocOpt.getValue())) {
+            ret[MemoryLocation(&inst)] = id++; // this memoryLocation construction is jank
+          }
         }
       }
     }

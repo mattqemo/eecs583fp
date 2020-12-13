@@ -29,13 +29,22 @@ struct InjectInstLog : public ModulePass {
     auto* IDParam = ConstantInt::get(
       instLogFunc->getFunctionType()->getFunctionParamType(0),
       instId);
-    auto* castPtrParam = CastInst::CreatePointerCast(
-      ptrVal,
-      instLogFunc->getFunctionType()->getFunctionParamType(1),
-      ""); // cast all pointers to whatever the instLogFunc accepts
-    auto* instLogCall = CallInst::Create(instLogFunc->getFunctionType(), instLogFunc, {IDParam, castPtrParam}, "");
-    castPtrParam->insertAfter(inst);
-    instLogCall->insertAfter(castPtrParam);
+
+    if (ptrVal->getType()->isPtrOrPtrVectorTy()) {
+      auto* castPtrParam = CastInst::CreatePointerCast(
+        ptrVal,
+        instLogFunc->getFunctionType()->getFunctionParamType(1),
+        ""); // cast all pointers to whatever the instLogFunc accepts
+
+      auto* instLogCall = CallInst::Create(instLogFunc->getFunctionType(), instLogFunc, {IDParam, castPtrParam}, "");
+      castPtrParam->insertAfter(inst);
+      instLogCall->insertAfter(castPtrParam);
+    }
+    else {
+      assert(isa<LoadInst>(ptrVal) && ptrVal->getType()->isPtrOrPtrVectorTy() && "ptrVal is a loaded pointer");
+      auto* instLogCall = CallInst::Create(instLogFunc->getFunctionType(), instLogFunc, {IDParam, ptrVal}, "");
+      instLogCall->insertAfter(inst);
+    }
   }
 
   bool runOnModule(Module &m) override {
@@ -43,26 +52,36 @@ struct InjectInstLog : public ModulePass {
     mainFunc = m.getFunction("main");
     assert(instLogFunc && "instLogFunc not found");
     assert(mainFunc && "mainFunc not found");
-    auto* dataLayout = new DataLayout(&m);
+
     bool changed = false;
     auto ptrsToLog = getMemLocToId(m);
+    auto mappingToId = ptrsToLog;
+
     for (auto& func : m) {
       for (auto& bb : func) {
         for (auto& inst : bb) {
-          if (auto memLocOpt = MemoryLocation::getOrNone(&inst); memLocOpt.hasValue() && ptrsToLog.count(memLocOpt.getValue())) {
-            // TODO: atone for const_cast sins
-            auto* memLocPtr = const_cast<Value*>(memLocOpt.getValue().Ptr);
-            auto memLocId = ptrsToLog[memLocOpt.getValue()];
-            ptrsToLog.erase(memLocOpt.getValue());
-            if (auto* memLocInst = dyn_cast<Instruction>(memLocPtr)) {
-              if (memLocInst->getFunction() == instLogFunc) continue; // Do not inject logging into instlogfunc - unnecessary and will cause infinite recursion
-              injectInstLogAfter(memLocInst, memLocId, memLocPtr);
-              // if (isa<LoadInst>(inst)) {
-              //   errs() << inst << '\n';
-              // }
-            } else {
-              injectInstLogAfter(&mainFunc->getEntryBlock().front(), memLocId, memLocPtr);
+          if (auto memLocOpt = MemoryLocation::getOrNone(&inst); memLocOpt.hasValue()) {
+            if (ptrsToLog.count(memLocOpt.getValue())) {
+              auto* memLocPtr = const_cast<Value*>(memLocOpt.getValue().Ptr);
+              auto memLocId = ptrsToLog[memLocOpt.getValue()];
+              ptrsToLog.erase(memLocOpt.getValue());
+              if (auto* memLocInst = dyn_cast<Instruction>(memLocPtr)) {
+                if (memLocInst->getFunction() == instLogFunc) continue; // Do not inject logging into instlogfunc - unnecessary and will cause infinite recursion
+                injectInstLogAfter(memLocInst, memLocId, memLocPtr);
+              } else {
+                injectInstLogAfter(&mainFunc->getEntryBlock().front(), memLocId, memLocPtr);
+              }
             }
+
+            if (isa<LoadInst>(&inst) && inst.getType()->isPtrOrPtrVectorTy() && mappingToId.count(memLocOpt.getValue())) { // check loads a ptr
+              auto memLocLoad = MemoryLocation(&inst);
+              auto memLocLoadId = ptrsToLog[memLocLoad];
+              ptrsToLog.erase(memLocLoad);
+
+              if (inst.getFunction() == instLogFunc) continue;
+              injectInstLogAfter(&inst, memLocLoadId, &inst);
+            }
+
             changed = true;
           }
         }

@@ -7,26 +7,12 @@
 
 PATH_MYPASS=~/eecs583fp/build/ANALYSIS/ANALYSIS.so ### Action Required: Specify the path to your pass ###
 NAME_MYPASS=-fp_analysis ### Action Required: Specify the name for your pass ###
-BENCH=src/simple.c
+BENCH_NAME=${1}
+INPUT=${2}
+BENCH=src/${BENCH_NAME}.c
 
 
-# # Prepare input to run
-# setup
-# # Convert source code to bitcode (IR)
-# # This approach has an issue with -O2, so we are going to stick with default optimization level (-O0)
-clang -emit-llvm -c ${BENCH} -o simple.bc
-# # Instrument profiler
-# opt -pgo-instr-gen -instrprof simple.bc -o simple.prof.bc
-# # Generate binary executable with profiler embedded
-# clang -fprofile-instr-generate simple.prof.bc -o simple.prof
-# # Collect profiling data
-# ./simple.prof ${INPUT} > /dev/null 2>&1
-# # Translate raw profiling data into LLVM data format
-# llvm-profdata merge -output=pgo.profdata default.profraw
+clang -emit-llvm -c ${BENCH} -o ${BENCH_NAME}.bc
+opt -load ${PATH_MYPASS} ${NAME_MYPASS} < ${BENCH_NAME}.bc > ${BENCH_NAME}.opt.bc
 
-# Prepare input to run
-# setup
-# Apply your pass to bitcode (IR)
-opt -load ${PATH_MYPASS} ${NAME_MYPASS} < simple.bc > simple.opt.bc
-
-clang simple.opt.bc && ./a.out
+clang -lm ${BENCH_NAME}.opt.bc && ./a.out ${INPUT} # need -lm for sqrt()

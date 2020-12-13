@@ -1,0 +1,5 @@
+digraph "CFG for 'getArea_PURE_' function" {
+	label="CFG for 'getArea_PURE_' function";
+
+	Node0x5626b4dee1c0 [shape=record,label="{entry:\l  %R = alloca %struct.rect, align 4\l  %0 = bitcast %struct.rect* %R to i64*\l  store i64 %R.coerce, i64* %0, align 4\l  %width = getelementptr inbounds %struct.rect, %struct.rect* %R, i32 0, i32 0\l  %1 = load i32, i32* %width, align 4\l  %height = getelementptr inbounds %struct.rect, %struct.rect* %R, i32 0, i32 1\l  %2 = load i32, i32* %height, align 4\l  %mul = mul nsw i32 %1, %2\l  ret i32 %mul\l}"];
+}

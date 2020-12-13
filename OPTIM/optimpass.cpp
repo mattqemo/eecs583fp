@@ -136,13 +136,7 @@ struct OptimOnAliasProfilePass : public ModulePass {
   }
 
   MemoryLocation getMemLocFromPtr(const Value* val) {
-    auto* memLocPtr = val;
-    // if (auto* loadInst = dyn_cast<LoadInst>(val)) {
-    //   memLocPtr = loadInst->getPointerOperand();
-    //   errs() << *val << ' ' << *memLocPtr << '\n';
-    // }
-
-    return MemoryLocation(memLocPtr); // TOCHECK: this is jank (this should work bc analysis just looks at ptr value but in practice it's bad style)
+    return MemoryLocation(val); // TOCHECK: this is jank (this should work bc analysis just looks at ptr value but in practice it's bad style)
   }
 
   bool areFunctionCallsIdentical(const fp583::InstLogAnalysis& instLogAnalysis, CallBase* call1, CallBase* call2, std::vector<std::pair<Value*, Value*>>& ptrArgsVals){
@@ -155,9 +149,7 @@ struct OptimOnAliasProfilePass : public ModulePass {
       auto* val1 = call1->getArgOperand(i);
       auto* val2 = call2->getArgOperand(i);
 
-      // errs() << *arg->getType() << '\n';
       if (arg->getType()->isPointerTy()) { // TOCHECK: this should be how we check for pointers
-        // errs() << "pointer type\n";
         auto memLoc1 = getMemLocFromPtr(val1), memLoc2 = getMemLocFromPtr(val2);
         double probaAlias = instLogAnalysis.getAliasProbability(memLoc1, memLoc2);
         if (probaAlias < aliasProbaThreshold) {

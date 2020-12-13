@@ -1,5 +1,5 @@
 digraph "CFG for 'fn_PURE_' function" {
 	label="CFG for 'fn_PURE_' function";
 
-	Node0x555f4f068a10 [shape=record,label="{entry:\l  %n.addr = alloca %struct.Num*, align 8\l  store %struct.Num* %n, %struct.Num** %n.addr, align 8\l  %0 = load %struct.Num*, %struct.Num** %n.addr, align 8\l  %valPtr = getelementptr inbounds %struct.Num, %struct.Num* %0, i32 0, i32 0\l  %1 = load i32*, i32** %valPtr, align 8\l  %2 = load i32, i32* %1, align 4\l  %3 = load %struct.Num*, %struct.Num** %n.addr, align 8\l  %valPtr1 = getelementptr inbounds %struct.Num, %struct.Num* %3, i32 0, i32 0\l  %4 = load i32*, i32** %valPtr1, align 8\l  %5 = load i32, i32* %4, align 4\l  %mul = mul nsw i32 %2, %5\l  %conv = sitofp i32 %mul to double\l  ret double %conv\l}"];
+	Node0x5581754b3a30 [shape=record,label="{entry:\l  %val.addr = alloca i32*, align 8\l  store i32* %val, i32** %val.addr, align 8\l  %0 = load i32*, i32** %val.addr, align 8\l  %1 = load i32, i32* %0, align 4\l  %conv = sitofp i32 %1 to double\l  %add = fadd double %conv, 2.000000e+00\l  ret double %add\l}"];
 }

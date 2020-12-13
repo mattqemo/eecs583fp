@@ -24,18 +24,25 @@ double other_PURE_(int *a, int* b) {
 
 int main()
 {
-  int val = 3;
-  int* ptr = &val;
-  int* ptr2 = ptr;
-  // int val1 = 5, val2 = 6;;
+  // int val = 3;
+  // int* ptr = &val;
+  // int* ptr2 = ptr;
+  // printf("%d", (int)ptr);
+  int val1 = 5, val2 = 6;;
 
-  // int* alias1_1 = &val1;
-  // int* alias1_2 = &val1;
-  // int* alias2_1 = &val2;
-  // int* alias2_2 = &val2;
-  // other_PURE_(alias2_1, alias2_1);
-  // other_PURE_(alias2_2, alias2_2);
-  // TODO: this example doesn't work^!!
+  int* alias1_1 = &val1;
+  int* alias1_2 = &val1;
+  int* alias2_1 = &val2;
+  int* alias2_2 = &val2;
+  other_PURE_(alias2_1, alias2_1);
+  other_PURE_(alias2_2, alias2_2);
+  other_PURE_(alias1_2, alias2_2);
+  other_PURE_(alias1_1, alias2_1);
+
+  int* global_ptr = &global;
+  int* global_ptr2 = &global;
+  other_PURE_(global_ptr, alias2_1);
+  other_PURE_(global_ptr2, alias2_1);
 
   // other_PURE_(&val1, &val2);
   // other_PURE_(&val1, &val2);
@@ -45,6 +52,9 @@ int main()
   // pureFunc_PURE_(&val2);
   // pureFunc_PURE_(&val1);
   // pureFunc_PURE_(&val1);
+
+  // void* ptr_void = (void*)ptr; // try with casting
+
   // try {
   //   randomfcn();
   // } catch(...) {}

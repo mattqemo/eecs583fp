@@ -1,5 +1,5 @@
 digraph "CFG for 'pureFunc_PURE_' function" {
 	label="CFG for 'pureFunc_PURE_' function";
 
-	Node0x55da294df080 [shape=record,label="{entry:\l  %a.addr = alloca i32*, align 8\l  %0 = bitcast i32** %a.addr to i8*\l  call void @_inst_log(i64 6, i8* %0)\l  store i32* %a, i32** %a.addr, align 8\l  %1 = load i32*, i32** %a.addr, align 8\l  %2 = bitcast i32* %1 to i8*\l  call void @_inst_log(i64 7, i8* %2)\l  %3 = load i32, i32* %1, align 4\l  store i32 %3, i32* @global, align 4\l  ret void\l}"];
+	Node0x55c3a360a060 [shape=record,label="{entry:\l  %a.addr = alloca i32*, align 8\l  store i32* %a, i32** %a.addr, align 8\l  %0 = load i32*, i32** %a.addr, align 8\l  %1 = load i32, i32* %0, align 4\l  store i32 %1, i32* @global, align 4\l  ret void\l}"];
 }
