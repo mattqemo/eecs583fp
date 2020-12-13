@@ -29,35 +29,51 @@ running BEFORE our last pass.
 TODO: Allow running this pass with requireAnalysis<> or something (whatever it's called)
 */
 
-namespace fp583 {
-typedef std::pair<MemoryLocation, MemoryLocation> MemLocPair;
+struct MemLocPair {
+  MemoryLocation first, second;
 
-struct hashMemLocPair {
-  size_t operator()(const MemLocPair& p) const {
-    auto hash1 = std::hash<void*>{}((void*)p.first.Ptr);
-    auto hash2 = std::hash<void*>{}((void*)p.second.Ptr);
-    return hash1 ^ hash2;
+  bool operator==(const MemLocPair &other) const {
+    return (first.Ptr == other.first.Ptr && second.Ptr == other.second.Ptr)
+        || (second.Ptr == other.first.Ptr && first.Ptr == other.second.Ptr);
   }
 };
 
+namespace std {
+  template <>
+  struct hash<MemLocPair> {
+    std::size_t operator()(const MemLocPair& p) const {
+      auto hash1 = std::hash<void*>{}((void*)p.first.Ptr);
+      auto hash2 = std::hash<void*>{}((void*)p.second.Ptr);
+      return hash1 ^ hash2;
+    }
+  };
+}
+
+
+namespace fp583 {
 struct AliasStats {
   uint32_t num_collisions;
   uint32_t num_comparisons;
 
   AliasStats() : num_collisions(0), num_comparisons(0) {}
 };
+
 struct InstLogAnalysis {
-  std::unordered_map<MemLocPair, AliasStats, hashMemLocPair> memLocPairToAliasStats;
+  std::unordered_map<MemLocPair, AliasStats> memLocPairToAliasStats;
 
   double getAliasProbability(const MemoryLocation& loc_a, const MemoryLocation& loc_b) const {
     if (loc_a.Ptr == loc_b.Ptr) {
       return 1.0;
     }
 
+    // errs() << "lookup: " << *loc_a.Ptr << ' ' << *loc_b.Ptr << '\n';
+
     auto it = InstLogAnalysis::memLocPairToAliasStats.find({loc_a, loc_b});
     if (it == InstLogAnalysis::memLocPairToAliasStats.end()) {
+      // errs() << "getAliasProbability: not found\n";
       return 0.0;
     }
+    // errs() << "getAliasProbability " << it->second.num_collisions << ' ' << it->second.num_comparisons << '\n';
     return (double)it->second.num_collisions / it->second.num_comparisons;
   }
 };
@@ -72,14 +88,16 @@ struct InstLogAnalysisWrapperPass : public ModulePass {
     std::unordered_map<MemoryLocation, size_t> memLocToId = getMemLocToId(m);
     std::unordered_map<size_t, MemoryLocation> idToMemLoc;
     for (auto& [memLoc, Id] : memLocToId) {
+      // errs() << *memLoc.Ptr << '\n';
       idToMemLoc[Id] = memLoc;
     }
+    // errs() << "\n\n\n";
     return idToMemLoc;
   }
 
-  std::unordered_map<MemLocPair, AliasStats, hashMemLocPair> parseLogAndGetAliasStats() const {
+  std::unordered_map<MemLocPair, AliasStats> parseLogAndGetAliasStats() const {
     std::unordered_map<size_t, uint64_t> idToShadowValue;
-    std::unordered_map<MemLocPair, AliasStats, hashMemLocPair> memLocPairToAliasStats;
+    std::unordered_map<MemLocPair, AliasStats> memLocPairToAliasStats;
 
     size_t instIdIn;
     void* memAddrIn_void; // TODO: change to uint64_t directly?
@@ -98,7 +116,8 @@ struct InstLogAnalysisWrapperPass : public ModulePass {
           pairAliasStats.num_comparisons++;
           if (memAddrIn == memAddrCompare) {
             pairAliasStats.num_collisions++;
-            // errs() << "\tCOLLISION DETECTED\n";
+            // errs() << "pair comp: " << *memLocCompare.Ptr << ' ' << *memLocIn.Ptr << '\n';
+            // errs() << "\tCOLLISION DETECTED\n\n";
           }
         }
       }
@@ -137,7 +156,7 @@ struct InstLogAnalysisWrapperPass : public ModulePass {
     // TODO: use morgans function and flip
     idToMemLoc = getIdToMemLocMapping(m);
 
-    std::unordered_map<MemLocPair, AliasStats, hashMemLocPair> memLocPairToAliasStats = parseLogAndGetAliasStats();
+    std::unordered_map<MemLocPair, AliasStats> memLocPairToAliasStats = parseLogAndGetAliasStats();
 
     instLogAnalysis.memLocPairToAliasStats = memLocPairToAliasStats;
 

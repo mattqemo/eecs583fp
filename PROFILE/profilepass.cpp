@@ -57,6 +57,9 @@ struct InjectInstLog : public ModulePass {
             if (auto* memLocInst = dyn_cast<Instruction>(memLocPtr)) {
               if (memLocInst->getFunction() == instLogFunc) continue; // Do not inject logging into instlogfunc - unnecessary and will cause infinite recursion
               injectInstLogAfter(memLocInst, memLocId, memLocPtr);
+              // if (isa<LoadInst>(inst)) {
+              //   errs() << inst << '\n';
+              // }
             } else {
               injectInstLogAfter(&mainFunc->getEntryBlock().front(), memLocId, memLocPtr);
             }

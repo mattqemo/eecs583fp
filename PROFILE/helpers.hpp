@@ -22,7 +22,10 @@ std::unordered_map<MemoryLocation, size_t> getMemLocToId(Module& m) {
     for (auto& bb : func) {
       for (auto& inst : bb) {
         if (auto memLocOpt = MemoryLocation::getOrNone(&inst); memLocOpt.hasValue() && !ret.count(memLocOpt.getValue())) {
-          // errs() << "memLoc added with value of " << *memLocOpt.getValue().Ptr << "\n";
+          // if (isa<LoadInst>(inst)) {
+          //   errs() << inst << '\n';
+          // }
+          // errs() << "memLoc added with value of " << *memLocOpt.getValue().Ptr << ' ' << inst << "\n";
           ret[memLocOpt.getValue()] = id++;
         }
       }
