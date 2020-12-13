@@ -1,5 +1,5 @@
 digraph "CFG for 'ConstructNum' function" {
 	label="CFG for 'ConstructNum' function";
 
-	Node0x564d40185e80 [shape=record,label="{entry:\l  %self.addr = alloca %struct.Num*, align 8\l  %0 = bitcast %struct.Num** %self.addr to i8*\l  call void @_inst_log(i64 3, i8* %0)\l  %valPtr_in.addr = alloca i32*, align 8\l  %1 = bitcast i32** %valPtr_in.addr to i8*\l  call void @_inst_log(i64 4, i8* %1)\l  store %struct.Num* %self, %struct.Num** %self.addr, align 8\l  store i32* %valPtr_in, i32** %valPtr_in.addr, align 8\l  %2 = load i32*, i32** %valPtr_in.addr, align 8\l  %3 = load %struct.Num*, %struct.Num** %self.addr, align 8\l  %valPtr = getelementptr inbounds %struct.Num, %struct.Num* %3, i32 0, i32 0\l  %4 = bitcast i32** %valPtr to i8*\l  call void @_inst_log(i64 5, i8* %4)\l  store i32* %2, i32** %valPtr, align 8\l  ret void\l}"];
+	Node0x55c986057e50 [shape=record,label="{entry:\l  %self.addr = alloca %struct.Num*, align 8\l  %valPtr_in.addr = alloca i32*, align 8\l  store %struct.Num* %self, %struct.Num** %self.addr, align 8\l  store i32* %valPtr_in, i32** %valPtr_in.addr, align 8\l  %0 = load i32*, i32** %valPtr_in.addr, align 8\l  %1 = load %struct.Num*, %struct.Num** %self.addr, align 8\l  %valPtr = getelementptr inbounds %struct.Num, %struct.Num* %1, i32 0, i32 0\l  store i32* %0, i32** %valPtr, align 8\l  ret void\l}"];
 }

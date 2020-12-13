@@ -29,10 +29,6 @@ std::unordered_map<MemoryLocation, size_t> getMemLocToId(Module& m) {
             ret[memLocOpt.getValue()] = id++;
             allocaMemLocs.insert(memLocOpt.getValue());
           }
-          // // adds loads of pointers (we check they load pointers with the 2nd condition)
-          // if (isa<LoadInst>(&inst) && inst.getType()->isPtrOrPtrVectorTy() && allocaMemLocs.count(memLocOpt.getValue())) {
-          //   ret[MemoryLocation(&inst)] = id++; // this memoryLocation construction is jank
-          // }
         }
       }
     }

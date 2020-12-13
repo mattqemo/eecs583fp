@@ -6,7 +6,7 @@
 ### e.g., ./run.sh compress compress.in or ./run.sh simple
 
 PATH_MYPASS=~/eecs583fp/build/OPTIM/OPTIM.so ### Action Required: Specify the path to your pass ###
-NAME_MYPASS=-fp_optim ### Action Required: Specify the name for your pass ###
+NAME_MYPASS=-fp_funcoptim
 BENCH_NAME=${1}
 INPUT_PROFILE=${2}
 INPUT_ACTUAL=${3}

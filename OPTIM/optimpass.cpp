@@ -3,10 +3,15 @@
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/Format.h"
+#include "llvm/Analysis/AliasAnalysis.h"
 #include "llvm/Analysis/BlockFrequencyInfo.h"
 #include "llvm/Analysis/BranchProbabilityInfo.h"
+#include "llvm/Analysis/Loads.h"
 #include "llvm/Analysis/LoopInfo.h"
+#include "llvm/Analysis/LoopIterator.h"
+#include "llvm/Analysis/LoopPass.h"
 #include "llvm/Analysis/MemoryLocation.h"
+#include "llvm/Transforms/Utils/SSAUpdater.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/DataLayout.h"
@@ -25,96 +30,6 @@
 using namespace llvm;
 
 /*
-loop:
-  store(memLocB) (memLoc IS variant)
-  %k = load(memLocA) (memLocA invariant)
-  memLocA and memLocB never alias -> hoist load?
-load(memLocA)\
-
-common expression elimination
-
-%memLocA = alloca i32 // I have storage somewhere for an i32 which could be a register
-
-
-int main() {
-  Class* a = new Class(argv[1]);
-  Class* b = a;
-
-  fn(a);
-  fn(b);
-}
-
-common expression elimination?
-double calcStuff(rect* first, rect* second) {
-  return sqrt(first->area) / (sqrt(second->area) + 1);
-}
-
-arg1 = load f64 first
-val1 = call sqrt(arg1)
-arg2 = load f64 second
-val2 = call sqrt(arg2)
-val3 = add val2 1
-val4 = div val1 val3
-ret val4
-
-...
-
-arg1 = load f64 first
-val1 = call sqrt(arg1)
-val2 = val1
-if (first != second) {
-  arg2pre = load f64 second
-  val2pre = call sqrt(arg2)
-  val2 = val2pre -> store
-}
-arg2 = phi(arg1, arg2pre)
-val2 = phi(val1, val2pre)
-val3 = add val2 1
-val4 = div val1 val3
-ret val4
-
-
-%i = load(memLocA)
-%a = functionCall(%i) //
-sqrt()
-fib()
-num_digits()
-log()
-toUpper()
-
-void fcn(int og[], int copy[], int start, int end){
-  memcpy(og, copy, len);
-  if (og != copy) // do copy
-}
-int main(){
-  fcn()
-}
-
-%j = load(memLocB)
-%b = functionCall(%j)
-
-%i = load(memLocA)
-if (memLocA != memLocB) %k = load(memLocB)
-%j = phi(%i, %k)
-
-
-%hoisted = load(memLocA)
-loop:
-  %k1 = phi(%k2, %hoisted)
-  store(memLocB)
-  if (memLocB == memLocA) %i1 = load(memLocA)
-  %k2 = phi(%i1, %k1)
-  memLocA and memLocB never alias -> hoist load?
-
-  for (i = 0 -> 100) {
-    b[i] = x;
-     a = b[CONSTANT] (not alias if CONSTANT > 100)
-    a[i + 1] = y;
-  }
-*/
-
-
-/*
 PLAN:
   - pure function optimization
   - maybe also LICM (see if can disable register promotion)
@@ -125,20 +40,17 @@ https://stackoverflow.com/questions/10990018/how-to-generate-assembly-code-with-
 
 namespace {
 
-struct OptimOnAliasProfilePass : public ModulePass {
+struct FuncCallsAliasProfilePass : public ModulePass {
   static char ID;
   double aliasProbaThreshold = 0.80;
 
-  OptimOnAliasProfilePass() : ModulePass(ID) {}
+  FuncCallsAliasProfilePass() : ModulePass(ID) {}
 
   void getAnalysisUsage(AnalysisUsage& AU) const override {
     AU.addRequired<fp583::InstLogAnalysisWrapperPass>();
   }
 
   MemoryLocation getMemLocFromPtr(const Value* val) {
-    // if (auto* loadInst = dyn_cast<LoadInst>(val)) {
-    //   return MemoryLocation(loadInst->getPointerOperand());
-    // }
     return MemoryLocation(val); // TOCHECK: this is jank (this should work bc analysis just looks at ptr value but in practice it's bad style)
   }
 
@@ -157,11 +69,8 @@ struct OptimOnAliasProfilePass : public ModulePass {
         return true;
       }
       else if (auto* loadInst1 = dyn_cast<LoadInst>(val1), *loadInst2 = dyn_cast<LoadInst>(val2); loadInst1 && loadInst2) {
-        errs() << "function calls load from memlocs, checking for alias!\n";
-        // auto memLoc1 = getMemLocFromPtr(val1), memLoc2 = getMemLocFromPtr(val2);
         auto memLoc1 = MemoryLocation::get(loadInst1), memLoc2 = MemoryLocation::get(loadInst2);
         double probaAlias = instLogAnalysis.getAliasProbability(memLoc1, memLoc2);
-        errs() << "probability is " << probaAlias << "\n";
         if (probaAlias < aliasProbaThreshold) {
           return false;
         }
@@ -258,7 +167,7 @@ struct OptimOnAliasProfilePass : public ModulePass {
 
               // check !ptrArgsVals.empty() to limit scope to only calls with ptr input
               if (areFunctionCallsIdentical(instLogAnalysis, currCall, prevCall, ptrArgsVals) && !ptrArgsVals.empty()) {
-                errs() << "optim function call: " << fCalled->getName() << "\n";
+                // errs() << "optim function call: " << fCalled->getName() << "\n";
                 auto* fixUpBB = removeFunctionCallAndFixUp(currCall, prevCall, ptrArgsVals);
                 fixUpBBs.insert(fixUpBB);
                 changed = true;
@@ -288,9 +197,80 @@ struct OptimOnAliasProfilePass : public ModulePass {
     return changed;
   }
 }; // end of struct OptOnAliasProfilePass
+
+
+/* ****************************************************************** */
+
+// LICM PASS
+
+/* ****************************************************************** */
+
+
+struct LICMAliasProfilePass : public LoopPass {
+  static char ID;
+  double aliasProbaThreshold = 0.02;
+
+
+  LICMAliasProfilePass() : LoopPass(ID) {}
+
+  void getAnalysisUsage(AnalysisUsage& AU) const override {
+    AU.addRequired<fp583::InstLogAnalysisWrapperPass>();
+    AU.addRequired<AAResultsWrapperPass>();
+  }
+
+  llvm::DenseMap<LoadInst*, std::vector<StoreInst*>> getMostlyInvariantLoads(Loop *L) {
+    auto& instLogAnalysis = getAnalysis<fp583::InstLogAnalysisWrapperPass>().getInstLogAnalysis();
+    auto& aliasResults = getAnalysis<AAResultsWrapperPass>().getAAResults();
+    llvm::DenseMap<LoadInst*, std::vector<StoreInst*>> hoistLoadsToStores;
+
+    for (auto* bb : L->getBlocks()) {
+      for (auto& inst : *bb) {
+        if (auto* loadInst = dyn_cast<LoadInst>(&inst)) {
+          hoistLoadsToStores[loadInst] = {}; // TODO: init with all stores in loop
+        }
+      }
+    }
+
+    /*
+    start with  stores to fix up = ALL
+    for every store and loads to hoist:
+      if is MUST alias || (proba alias > threshold) --> remove load to hoist from set (shouldn't hoist)
+      if is WILL NOT alias --> remove store from dependent stores vec (no fix up ever needed)
+    */
+    for (auto* bb : L->getBlocks()) {
+      for (auto& inst : *bb) {
+        if (auto* storeInst = dyn_cast<StoreInst>(&inst)) {
+          llvm::remove_if(hoistLoadsToStores, [&](const auto& loadInstAndStore) {
+            auto memLoc1 = MemoryLocation::get(loadInstAndStore.first), memLoc2 = MemoryLocation::get(storeInst);
+            return
+              aliasResults.isMustAlias(memLoc1, memLoc2) ||
+              instLogAnalysis.getAliasProbability(memLoc1, memLoc2) > aliasProbaThreshold;
+          });
+        }
+      }
+    }
+    return hoistLoadsToStores;
+  }
+
+  bool runOnLoop(Loop *L, LPPassManager &LPM) override {
+    bool changed = false;
+
+    /* 1. use the log analysis to determine if there are any loads worth hoisting */
+    auto mostlyInvariantLoads = getMostlyInvariantLoads(L);
+    for (auto& [loadInst, dependentStores] : mostlyInvariantLoads) {
+      loadInst->moveBefore(L->getLoopPreheader()->getTerminator());
+    }
+
+    return changed;
+  }
+}; // end of struct LICMAliasProfilePass
 }  // end of anonymous namespace
 
-char OptimOnAliasProfilePass::ID = 0;
-static RegisterPass<OptimOnAliasProfilePass> x("fp_optim", "OptimOnAliasProfilePass Pass",
+char FuncCallsAliasProfilePass::ID = 0;
+char LICMAliasProfilePass::ID = 0;
+static RegisterPass<FuncCallsAliasProfilePass> x("fp_funcoptim", "FuncCallsAliasProfilePass Pass",
+                             false /* Only looks at CFG */,
+                             false /* Analysis Pass */);
+static RegisterPass<LICMAliasProfilePass> xx("fp_licmoptim", "LICMAliasProfilePass Pass",
                              false /* Only looks at CFG */,
                              false /* Analysis Pass */);

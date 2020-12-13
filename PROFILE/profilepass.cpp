@@ -30,21 +30,14 @@ struct InjectInstLog : public ModulePass {
       instLogFunc->getFunctionType()->getFunctionParamType(0),
       instId);
 
-    // if (ptrVal->getType()->isPtrOrPtrVectorTy()) {
-      auto* castPtrParam = CastInst::CreatePointerCast(
-        ptrVal,
-        instLogFunc->getFunctionType()->getFunctionParamType(1),
-        ""); // cast all pointers to whatever the instLogFunc accepts
+    auto* castPtrParam = CastInst::CreatePointerCast(
+      ptrVal,
+      instLogFunc->getFunctionType()->getFunctionParamType(1),
+      ""); // cast all pointers to whatever the instLogFunc accepts
 
-      auto* instLogCall = CallInst::Create(instLogFunc->getFunctionType(), instLogFunc, {IDParam, castPtrParam}, "");
-      castPtrParam->insertAfter(inst);
-      instLogCall->insertAfter(castPtrParam);
-    // }
-    // else {
-    //   assert(isa<LoadInst>(ptrVal) && ptrVal->getType()->isPtrOrPtrVectorTy() && "ptrVal is a loaded pointer");
-    //   auto* instLogCall = CallInst::Create(instLogFunc->getFunctionType(), instLogFunc, {IDParam, ptrVal}, "");
-    //   instLogCall->insertAfter(inst);
-    // }
+    auto* instLogCall = CallInst::Create(instLogFunc->getFunctionType(), instLogFunc, {IDParam, castPtrParam}, "");
+    castPtrParam->insertAfter(inst);
+    instLogCall->insertAfter(castPtrParam);
   }
 
   bool runOnModule(Module &m) override {
@@ -72,16 +65,6 @@ struct InjectInstLog : public ModulePass {
                 injectInstLogAfter(&mainFunc->getEntryBlock().front(), memLocId, memLocPtr);
               }
             }
-
-            // if (isa<LoadInst>(&inst) && inst.getType()->isPtrOrPtrVectorTy() && mappingToId.count(memLocOpt.getValue())) { // check loads a ptr
-            //   auto memLocLoad = MemoryLocation(&inst);
-            //   auto memLocLoadId = ptrsToLog[memLocLoad];
-            //   ptrsToLog.erase(memLocLoad);
-
-            //   if (inst.getFunction() == instLogFunc) continue;
-            //   injectInstLogAfter(&inst, memLocLoadId, &inst);
-            // }
-
             changed = true;
           }
         }

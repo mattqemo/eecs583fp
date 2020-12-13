@@ -37,8 +37,6 @@ struct MemLocPair {
   bool operator==(const MemLocPair &other) const {
     return (first == other.first && second == other.second)
         || (second == other.first && first == other.second);
-    // return (first.Ptr == other.first.Ptr && second.Ptr == other.second.Ptr)
-    //     || (second.Ptr == other.first.Ptr && first.Ptr == other.second.Ptr);
   }
 };
 
@@ -70,14 +68,14 @@ struct InstLogAnalysis {
       return 1.0;
     }
 
-    errs() << "lookup: " << *loc_a.Ptr << ' ' << *loc_b.Ptr << '\n';
+    // errs() << "lookup: " << *loc_a.Ptr << ' ' << *loc_b.Ptr << '\n';
 
     auto it = InstLogAnalysis::memLocPairToAliasStats.find({loc_a, loc_b});
     if (it == InstLogAnalysis::memLocPairToAliasStats.end()) {
-      errs() << "getAliasProbability: not found\n";
+      // errs() << "getAliasProbability: not found\n";
       return 0.0;
     }
-    errs() << "getAliasProbability " << it->second.num_collisions << ' ' << it->second.num_comparisons << '\n';
+    // errs() << "getAliasProbability " << it->second.num_collisions << ' ' << it->second.num_comparisons << '\n';
     return (double)it->second.num_collisions / it->second.num_comparisons;
   }
 };
@@ -92,10 +90,8 @@ struct InstLogAnalysisWrapperPass : public ModulePass {
     std::unordered_map<MemoryLocation, size_t> memLocToId = getMemLocToId(m);
     std::unordered_map<size_t, MemoryLocation> idToMemLoc;
     for (auto& [memLoc, Id] : memLocToId) {
-      // errs() << *memLoc.Ptr << '\n';
       idToMemLoc[Id] = memLoc;
     }
-    // errs() << "\n\n\n";
     return idToMemLoc;
   }
 
@@ -103,13 +99,13 @@ struct InstLogAnalysisWrapperPass : public ModulePass {
     std::unordered_map<size_t, uint64_t> idToShadowValue;
     std::unordered_map<MemLocPair, AliasStats> memLocPairToAliasStats;
 
-    size_t instIdIn;
-    uint64_t memAddrIn;
+    size_t instIdIn = 0;
+    void* memAddrIn_void = nullptr;
     std::ifstream ins("../583simple/log.log");
-    while (ins >> instIdIn >> memAddrIn) {
+    while (ins >> instIdIn >> memAddrIn_void) {
+      uint64_t memAddrIn = (uint64_t)memAddrIn_void;
       auto memLocIn = idToMemLoc.at(instIdIn);
       idToShadowValue[instIdIn] = memAddrIn;
-
       for (auto it_shadow = idToShadowValue.begin(); it_shadow != idToShadowValue.end(); ++it_shadow) {
         auto memLocCompare = idToMemLoc.at(it_shadow->first);
         uint64_t memAddrCompare = it_shadow->second;
@@ -119,8 +115,6 @@ struct InstLogAnalysisWrapperPass : public ModulePass {
           pairAliasStats.num_comparisons++;
           if (memAddrIn == memAddrCompare) {
             pairAliasStats.num_collisions++;
-            // errs() << "pair comp: " << *memLocCompare.Ptr << ' ' << *memLocIn.Ptr << '\n';
-            // errs() << "\tCOLLISION DETECTED\n\n";
           }
         }
       }
