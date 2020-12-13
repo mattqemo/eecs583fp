@@ -30,7 +30,7 @@ struct InjectInstLog : public ModulePass {
       instLogFunc->getFunctionType()->getFunctionParamType(0),
       instId);
 
-    if (ptrVal->getType()->isPtrOrPtrVectorTy()) {
+    // if (ptrVal->getType()->isPtrOrPtrVectorTy()) {
       auto* castPtrParam = CastInst::CreatePointerCast(
         ptrVal,
         instLogFunc->getFunctionType()->getFunctionParamType(1),
@@ -39,12 +39,12 @@ struct InjectInstLog : public ModulePass {
       auto* instLogCall = CallInst::Create(instLogFunc->getFunctionType(), instLogFunc, {IDParam, castPtrParam}, "");
       castPtrParam->insertAfter(inst);
       instLogCall->insertAfter(castPtrParam);
-    }
-    else {
-      assert(isa<LoadInst>(ptrVal) && ptrVal->getType()->isPtrOrPtrVectorTy() && "ptrVal is a loaded pointer");
-      auto* instLogCall = CallInst::Create(instLogFunc->getFunctionType(), instLogFunc, {IDParam, ptrVal}, "");
-      instLogCall->insertAfter(inst);
-    }
+    // }
+    // else {
+    //   assert(isa<LoadInst>(ptrVal) && ptrVal->getType()->isPtrOrPtrVectorTy() && "ptrVal is a loaded pointer");
+    //   auto* instLogCall = CallInst::Create(instLogFunc->getFunctionType(), instLogFunc, {IDParam, ptrVal}, "");
+    //   instLogCall->insertAfter(inst);
+    // }
   }
 
   bool runOnModule(Module &m) override {
@@ -73,14 +73,14 @@ struct InjectInstLog : public ModulePass {
               }
             }
 
-            if (isa<LoadInst>(&inst) && inst.getType()->isPtrOrPtrVectorTy() && mappingToId.count(memLocOpt.getValue())) { // check loads a ptr
-              auto memLocLoad = MemoryLocation(&inst);
-              auto memLocLoadId = ptrsToLog[memLocLoad];
-              ptrsToLog.erase(memLocLoad);
+            // if (isa<LoadInst>(&inst) && inst.getType()->isPtrOrPtrVectorTy() && mappingToId.count(memLocOpt.getValue())) { // check loads a ptr
+            //   auto memLocLoad = MemoryLocation(&inst);
+            //   auto memLocLoadId = ptrsToLog[memLocLoad];
+            //   ptrsToLog.erase(memLocLoad);
 
-              if (inst.getFunction() == instLogFunc) continue;
-              injectInstLogAfter(&inst, memLocLoadId, &inst);
-            }
+            //   if (inst.getFunction() == instLogFunc) continue;
+            //   injectInstLogAfter(&inst, memLocLoadId, &inst);
+            // }
 
             changed = true;
           }

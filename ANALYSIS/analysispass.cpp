@@ -26,15 +26,19 @@ using namespace llvm;
 /*
 TODO: address potential issue that our profile data might be invalidated by other transforming passes
 running BEFORE our last pass.
-TODO: Allow running this pass with requireAnalysis<> or something (whatever it's called)
+TODO: Debug analysis pass!!! classex optimization fails because getAliasProbability fails
+
+TODO:  loop hoisting optimization (pls be easier than this)
 */
 
 struct MemLocPair {
   MemoryLocation first, second;
 
   bool operator==(const MemLocPair &other) const {
-    return (first.Ptr == other.first.Ptr && second.Ptr == other.second.Ptr)
-        || (second.Ptr == other.first.Ptr && first.Ptr == other.second.Ptr);
+    return (first == other.first && second == other.second)
+        || (second == other.first && first == other.second);
+    // return (first.Ptr == other.first.Ptr && second.Ptr == other.second.Ptr)
+    //     || (second.Ptr == other.first.Ptr && first.Ptr == other.second.Ptr);
   }
 };
 
@@ -66,14 +70,14 @@ struct InstLogAnalysis {
       return 1.0;
     }
 
-    // errs() << "lookup: " << *loc_a.Ptr << ' ' << *loc_b.Ptr << '\n';
+    errs() << "lookup: " << *loc_a.Ptr << ' ' << *loc_b.Ptr << '\n';
 
     auto it = InstLogAnalysis::memLocPairToAliasStats.find({loc_a, loc_b});
     if (it == InstLogAnalysis::memLocPairToAliasStats.end()) {
-      // errs() << "getAliasProbability: not found\n";
+      errs() << "getAliasProbability: not found\n";
       return 0.0;
     }
-    // errs() << "getAliasProbability " << it->second.num_collisions << ' ' << it->second.num_comparisons << '\n';
+    errs() << "getAliasProbability " << it->second.num_collisions << ' ' << it->second.num_comparisons << '\n';
     return (double)it->second.num_collisions / it->second.num_comparisons;
   }
 };
@@ -100,11 +104,10 @@ struct InstLogAnalysisWrapperPass : public ModulePass {
     std::unordered_map<MemLocPair, AliasStats> memLocPairToAliasStats;
 
     size_t instIdIn;
-    void* memAddrIn_void; // TODO: change to uint64_t directly?
+    uint64_t memAddrIn;
     std::ifstream ins("../583simple/log.log");
-    while (ins >> instIdIn >> memAddrIn_void) {
+    while (ins >> instIdIn >> memAddrIn) {
       auto memLocIn = idToMemLoc.at(instIdIn);
-      uint64_t memAddrIn = (uint64_t)memAddrIn_void;
       idToShadowValue[instIdIn] = memAddrIn;
 
       for (auto it_shadow = idToShadowValue.begin(); it_shadow != idToShadowValue.end(); ++it_shadow) {

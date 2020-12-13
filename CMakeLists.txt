@@ -1,4 +1,6 @@
 set (CMAKE_CXX_STANDARD 17)
+set (CMAKE_CXX_FLAGS_RELEASE "-O3")
+set (CMAKE_CXX_FLAGS_DEBUG "-g -O3")
 cmake_minimum_required(VERSION 3.4.3)
 find_package(LLVM REQUIRED CONFIG)                        # This will find the shared LLVM build.
 list(APPEND CMAKE_MODULE_PATH "${LLVM_CMAKE_DIR}")        # You don't need to change ${LLVM_CMAKE_DIR} since it is already defined.

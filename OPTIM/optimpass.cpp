@@ -136,6 +136,9 @@ struct OptimOnAliasProfilePass : public ModulePass {
   }
 
   MemoryLocation getMemLocFromPtr(const Value* val) {
+    // if (auto* loadInst = dyn_cast<LoadInst>(val)) {
+    //   return MemoryLocation(loadInst->getPointerOperand());
+    // }
     return MemoryLocation(val); // TOCHECK: this is jank (this should work bc analysis just looks at ptr value but in practice it's bad style)
   }
 
@@ -149,17 +152,22 @@ struct OptimOnAliasProfilePass : public ModulePass {
       auto* val1 = call1->getArgOperand(i);
       auto* val2 = call2->getArgOperand(i);
 
-      if (arg->getType()->isPointerTy()) { // TOCHECK: this should be how we check for pointers
-        auto memLoc1 = getMemLocFromPtr(val1), memLoc2 = getMemLocFromPtr(val2);
+
+      if (val1 == val2) {
+        return true;
+      }
+      else if (auto* loadInst1 = dyn_cast<LoadInst>(val1), *loadInst2 = dyn_cast<LoadInst>(val2); loadInst1 && loadInst2) {
+        errs() << "function calls load from memlocs, checking for alias!\n";
+        // auto memLoc1 = getMemLocFromPtr(val1), memLoc2 = getMemLocFromPtr(val2);
+        auto memLoc1 = MemoryLocation::get(loadInst1), memLoc2 = MemoryLocation::get(loadInst2);
         double probaAlias = instLogAnalysis.getAliasProbability(memLoc1, memLoc2);
+        errs() << "probability is " << probaAlias << "\n";
         if (probaAlias < aliasProbaThreshold) {
           return false;
         }
         ptrArgsVals.push_back({val1, val2});
       }
-      else if (val1 != val2) {
-        return false;
-      }
+      else return false;
     }
     return true;
   }
@@ -259,7 +267,7 @@ struct OptimOnAliasProfilePass : public ModulePass {
               }
             }
           }
-          
+
           if (callNotDeleted) prevFunctionCalls[fCalled].push_back(currCall);
           else break;
         }

@@ -1,5 +1,5 @@
 digraph "CFG for 'randomfcn' function" {
 	label="CFG for 'randomfcn' function";
 
-	Node0x55c3a3608f90 [shape=record,label="{entry:\l  %a = alloca i32, align 4\l  %b = alloca i32, align 4\l  store i32 5, i32* %a, align 4\l  %0 = load i32, i32* %a, align 4\l  store i32 %0, i32* %a, align 4\l  %1 = load i32, i32* %a, align 4\l  store i32 %1, i32* %b, align 4\l  store i32 5, i32* @global, align 4\l  ret void\l}"];
+	Node0x56155df03f90 [shape=record,label="{entry:\l  %a = alloca i32, align 4\l  %b = alloca i32, align 4\l  store i32 5, i32* %a, align 4\l  %0 = load i32, i32* %a, align 4\l  store i32 %0, i32* %a, align 4\l  %1 = load i32, i32* %a, align 4\l  store i32 %1, i32* %b, align 4\l  store i32 5, i32* @global, align 4\l  ret void\l}"];
 }

@@ -44,9 +44,9 @@ int main()
   other_PURE_(global_ptr, alias2_1);
   other_PURE_(global_ptr2, alias2_1);
 
-  // other_PURE_(&val1, &val2);
-  // other_PURE_(&val1, &val2);
-  // other_PURE_(&val2, &val1);
+  other_PURE_(&val1, &val2);
+  other_PURE_(&val1, &val2);
+  other_PURE_(&val2, &val1);
 
   // pureFunc_PURE_(&val1);
   // pureFunc_PURE_(&val2);
