@@ -1,0 +1,23 @@
+aliasProbaThreshold: 0.80
+percent likelihood: 100
+real	0m0.763s
+percent likelihood: 90
+real	0m0.831s
+percent likelihood: 80
+real	0m0.905s
+percent likelihood: 70
+real	0m0.976s
+percent likelihood: 60
+real	0m1.052s
+percent likelihood: 50
+real	0m1.128s
+percent likelihood: 40
+real	0m1.193s
+percent likelihood: 30
+real	0m1.267s
+percent likelihood: 20
+real	0m1.334s
+percent likelihood: 10
+real	0m1.413s
+percent likelihood: 0
+real	0m1.487s
