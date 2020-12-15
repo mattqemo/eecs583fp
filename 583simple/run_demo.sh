@@ -6,15 +6,15 @@
 ### e.g., ./run.sh compress compress.in or ./run.sh simple
 
 PATH_MYPASS=~/eecs583fp/build/OPTIM/OPTIM.so ### Action Required: Specify the path to your pass ###
-# NAME_MYPASS=-fp_funcoptim
-NAME_MYPASS=-fp_licmoptim
+NAME_MYPASS=-fp_funcoptim
+# NAME_MYPASS=-fp_licmoptim
 BENCH_NAME=${1}
 INPUT_PROFILE=${2}
 INPUT_ACTUAL=${3}
 BENCH=src/${BENCH_NAME}.c
 
 echo "RUNOPT: profiling..."
-./run_profile.sh ${BENCH_NAME} ${INPUT_PROFILE} > /dev/null
+./run_profile.sh ${BENCH_NAME} ${INPUT_PROFILE}
 echo "RUNOPT: building for optimization..."
 
 echo "RUNOPT: timing compilation of unoptimized code..."

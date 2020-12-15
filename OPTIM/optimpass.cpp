@@ -239,6 +239,7 @@ struct LICMAliasProfilePass : public LoopPass {
     auto allStores = std::vector<StoreInst*>{};
     forEachInstOfType<StoreInst>(L->getBlocks(), [&allStores](auto* storeInst){ allStores.push_back(storeInst); });
     // All loads map to all stores initially
+    // TODO: I think we need to check first that the load is constant
     forEachInstOfType<LoadInst>(L->getBlocks(), [&hoistLoadsToStores, &allStores](auto* loadInst){ hoistLoadsToStores[loadInst] = allStores; });
 
     // Remove any loads which must-alias with any stores, or which are too likely to alias
@@ -263,6 +264,40 @@ struct LICMAliasProfilePass : public LoopPass {
     return hoistLoadsToStores;
   }
 
+  void insertFixUpCode(Loop *L, LoadInst* loadInst, StoreInst* storeInst, LoadInst* headerLoadValue) {
+    auto* compForAlias = new ICmpInst(*storeInst->getParent(), ICmpInst::ICMP_EQ, storeInst->getPointerOperand(), loadInst->getPointerOperand());
+
+    auto* storeBB = storeInst->getParent();
+    auto* followingBB = storeBB->splitBasicBlock(storeInst);
+    storeBB->getInstList().back().eraseFromParent(); // erase unconditional branch added by splitBasicBlock
+
+    auto* f = storeBB->getParent();
+    auto* fixUpBB = BasicBlock::Create(f->getContext(), "", f);
+    auto* condCheckToFixUpBranch = BranchInst::Create(fixUpBB, followingBB, compForAlias, storeBB);
+    auto* fixUpEndBranch = BranchInst::Create(followingBB, fixUpBB);
+
+    auto* fixUpStore = new StoreInst(storeInst->getValueOperand(), headerLoadValue, fixUpBB);
+  }
+
+  void hoistLoadAndInsertFixUp(Loop *L, LoadInst* loadInst, const std::vector<StoreInst*> dependentStores) {
+    auto* function = loadInst->getParent()->getParent();
+    auto& entryBB = function->getEntryBlock();
+
+    /* Function Entry Block */
+    auto* loadValueVar = new AllocaInst(loadInst->getType(), 0, nullptr, "", &(*entryBB.begin()));
+
+    /* Loop Preheader */
+    auto* initVal = new LoadInst(loadInst, "", L->getLoopPreheader()->getTerminator());
+    auto* storeInitVal = new StoreInst(initVal, loadValueVar, L->getLoopPreheader()->getTerminator());
+
+    /* Loop header */
+    auto* headerLoadValue = new LoadInst(loadValueVar, "", loadInst);
+
+    for (auto* storeInst : dependentStores) {
+      insertFixUpCode(L, loadInst, storeInst, headerLoadValue);
+    }
+  }
+
   bool runOnLoop(Loop *L, LPPassManager &LPM) override {
     bool changed = false;
 
@@ -270,6 +305,7 @@ struct LICMAliasProfilePass : public LoopPass {
     auto mostlyInvariantLoads = getMostlyInvariantLoads(L);
     for (auto& [loadInst, dependentStores] : mostlyInvariantLoads) {
       errs() << "load is mostly invariant: " << *loadInst << "\n";
+      hoistLoadAndInsertFixUp(L, loadInst, dependentStores);
       // TODO: hoist load inst to preheader
       //      hoist dependent instructions (math)
       //      add re-calculation code in fixup when a store to the same pointer happens

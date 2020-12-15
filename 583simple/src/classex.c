@@ -15,7 +15,7 @@ void ConstructNum(Num_t* self, int* valPtr_in) {
 double fn_PURE_(int val) {
   double d = 3.7;
   for (int i = 0; i < 64; ++i) {
-    d = (int)((val + 2.0) / 10) % 7 + 1.0;
+    d = (int)((val + d + 2.0) / 10) % 7 + 1.0;
   }
   return d;
 }
@@ -31,8 +31,7 @@ int main(int argc, char* argv[]) {
   srand(time(NULL));
     // [1, 2, 3]: user passes in 2 indices
   int i1, i2, loopCount, percent_likelihood_same, shouldPrint;
-  char c;
-  sscanf(argv[1], "%d %c %d %c %d %c %d %c %d", &i1, &c, &i2, &c, &loopCount, &c, &percent_likelihood_same, &c, &shouldPrint);
+  sscanf(argv[1], "%d %*c %d %*c %d %*c %d %*c %d", &i1, &i2, &loopCount, &percent_likelihood_same, &shouldPrint);
   if (shouldPrint)
     fprintf(stderr, "percent likelihood: %d\n", percent_likelihood_same);
   if (i1 >= ARR_SIZE || i2 >= ARR_SIZE) return fprintf(stderr, "NO STOP\n");

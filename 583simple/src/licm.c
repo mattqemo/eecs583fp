@@ -20,19 +20,20 @@ int main(int argc, char* argv[]) {
 
 	const int j = 5;
 	int k = j + 1;
-	// %INITIAL = (A[j] * 3.1415926 + 3948.23891) / 27.5;
 	for(i = 0; i < iters; i++) {
   		double temp = (A[j] * 3.1415926 + 3948.23891) / 27.5;
-		// %temp = load(INITIAL);
 		if(i % aliasPeriod == 0)
   			k = j;
 		else if(i % aliasPeriod == 1)
   			k = j + 1;
-		// IF ALIAS:
-		//		%recalc = (A[k] * 3.1415926 + 3948.23891) / 27.5;
-		// 		store(recalc, INITIAL)
 		A[k] = temp;
 	}
 
 	return 0;
 }
+
+// %INITIAL = (A[j] * 3.1415926 + 3948.23891) / 27.5;
+// %temp = load(INITIAL);
+// IF ALIAS:
+//		%recalc = (A[k] * 3.1415926 + 3948.23891) / 27.5;
+// 		store(recalc, INITIAL)

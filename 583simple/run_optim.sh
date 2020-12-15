@@ -38,8 +38,8 @@ clang -lm ${BENCH_NAME}.opt.bc # need -lm for sqrt()
 
 # capture output of time and classex by redirecting stderr
 # run grep to only collect real runtime and parameter (percent likelihood)
-likelihoods=(100 90 80 70 60 50 40 30 20 10 0)
-for l in ${likelihoods[@]}; do
-    INPUT="2,2,100000,${l},1"
-    (time ./a.out "${INPUT}") 2>&1 > /dev/null |grep -E -- 'percent|real' >> classex_stats.txt
-done
+# likelihoods=(100 90 80 70 60 50 40 30 20 10 0)
+# for l in ${likelihoods[@]}; do
+#     INPUT="2,2,100000,${l},1"
+#     (time ./a.out "${INPUT}") 2>&1 > /dev/null |grep -E -- 'percent|real' >> classex_stats.txt
+# done

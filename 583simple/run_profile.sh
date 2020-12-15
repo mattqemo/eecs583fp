@@ -14,6 +14,9 @@ BENCH=src/${BENCH_NAME}.c
 clang -emit-llvm -lm -c ${BENCH} -o ${BENCH_NAME}.bc
 opt -load ${PATH_MYPASS} ${NAME_MYPASS} < ${BENCH_NAME}.bc > ${BENCH_NAME}.prof.bc
 
-# echo "RUNPROF: timing profiling code runtime..."
-# clang -lm ${BENCH_NAME}.prof.bc && time ./a.out ${INPUT} > /dev/null # need -lm for sqrt()
-clang -lm ${BENCH_NAME}.prof.bc && ./a.out ${INPUT} > /dev/null # need -lm for sqrt()
+echo "RUNPROF: timing uninstrumented code runtime..."
+clang -lm ${BENCH_NAME}.bc && time ./a.out ${INPUT} > /dev/null # need -lm for sqrt()
+
+echo "RUNPROF: timing profiling code runtime..."
+clang -lm ${BENCH_NAME}.prof.bc && time ./a.out ${INPUT} > /dev/null # need -lm for sqrt()
+# clang -lm ${BENCH_NAME}.prof.bc && ./a.out ${INPUT} > /dev/null # need -lm for sqrt()
