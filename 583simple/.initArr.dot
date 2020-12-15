@@ -1,0 +1,14 @@
+digraph "CFG for 'initArr' function" {
+	label="CFG for 'initArr' function";
+
+	Node0x558ef39aad60 [shape=record,label="{entry:\l  %0 = alloca i32\l  %1 = alloca i32\l  %2 = alloca i32\l  %3 = alloca i32\l  %4 = alloca i32\l  %5 = alloca double*\l  %A.addr = alloca double*, align 8\l  %size.addr = alloca i32, align 4\l  %i = alloca i32, align 4\l  store double* %A, double** %A.addr, align 8\l  store i32 %size, i32* %size.addr, align 4\l  store i32 0, i32* %i, align 4\l  %6 = load double*, double** %A.addr\l  store double* %6, double** %5\l  %7 = load i32, i32* %size.addr\l  store i32 %7, i32* %4\l  %8 = load i32, i32* %i\l  store i32 %8, i32* %3\l  %9 = load i32, i32* %i\l  store i32 %9, i32* %2\l  %10 = load i32, i32* %i\l  store i32 %10, i32* %1\l  %11 = load i32, i32* %i\l  store i32 %11, i32* %0\l  br label %for.cond\l}"];
+	Node0x558ef39aad60 -> Node0x558ef39abe90;
+	Node0x558ef39abe90 [shape=record,label="{for.cond:                                         \l  %12 = load i32, i32* %2\l  %13 = load i32, i32* %i, align 4\l  %14 = load i32, i32* %4\l  %15 = load i32, i32* %size.addr, align 4\l  %cmp = icmp slt i32 %13, %15\l  br i1 %cmp, label %for.body, label %for.end\l|{<s0>T|<s1>F}}"];
+	Node0x558ef39abe90:s0 -> Node0x558ef39abee0;
+	Node0x558ef39abe90:s1 -> Node0x558ef39abf80;
+	Node0x558ef39abee0 [shape=record,label="{for.body:                                         \l  %16 = load i32, i32* %1\l  %17 = load i32, i32* %0\l  %18 = load i32, i32* %i, align 4\l  %conv = sitofp i32 %18 to double\l  %mul = fmul double %conv, 2.239800e+00\l  %19 = load double*, double** %5\l  %20 = load double*, double** %A.addr, align 8\l  %21 = load i32, i32* %i, align 4\l  %idxprom = sext i32 %21 to i64\l  %arrayidx = getelementptr inbounds double, double* %20, i64 %idxprom\l  store double %mul, double* %arrayidx, align 8\l  br label %for.inc\l}"];
+	Node0x558ef39abee0 -> Node0x558ef39abf30;
+	Node0x558ef39abf30 [shape=record,label="{for.inc:                                          \l  %22 = load i32, i32* %3\l  %23 = load i32, i32* %i, align 4\l  %inc = add nsw i32 %23, 1\l  store i32 %inc, i32* %i, align 4\l  br label %for.cond\l}"];
+	Node0x558ef39abf30 -> Node0x558ef39abe90;
+	Node0x558ef39abf80 [shape=record,label="{for.end:                                          \l  ret void\l}"];
+}

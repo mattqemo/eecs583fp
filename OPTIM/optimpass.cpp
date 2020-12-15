@@ -25,6 +25,7 @@
 #include <map>
 #include <unordered_map>
 #include <fstream>
+#include <cassert>
 #include <utility>
 
 using namespace llvm;
@@ -239,8 +240,11 @@ struct LICMAliasProfilePass : public LoopPass {
     auto allStores = std::vector<StoreInst*>{};
     forEachInstOfType<StoreInst>(L->getBlocks(), [&allStores](auto* storeInst){ allStores.push_back(storeInst); });
     // All loads map to all stores initially
-    // TODO: I think we need to check first that the load is constant
-    forEachInstOfType<LoadInst>(L->getBlocks(), [&hoistLoadsToStores, &allStores](auto* loadInst){ hoistLoadsToStores[loadInst] = allStores; });
+    forEachInstOfType<LoadInst>(L->getBlocks(), [L, &hoistLoadsToStores, &allStores](auto* loadInst){
+      if (L->isLoopInvariant(loadInst->getPointerOperand())) { // need pointer to be loop invariant
+        hoistLoadsToStores[loadInst] = allStores; 
+      }
+    });
 
     // Remove any loads which must-alias with any stores, or which are too likely to alias
     llvm::remove_if(hoistLoadsToStores, [&](const auto& loadInstAndStores) {
@@ -252,10 +256,23 @@ struct LICMAliasProfilePass : public LoopPass {
 
     // Remove any load/store pairs which are known to never alias
     for (auto& loadInstAndStores : hoistLoadsToStores) {
+      int sizeBefore = loadInstAndStores.second.size();
+      int sizeAfter = sizeBefore;
       llvm::remove_if(loadInstAndStores.second, [&](auto* storeInst) {
-        return aliasResults.isNoAlias(MemoryLocation::get(loadInstAndStores.first), MemoryLocation::get(storeInst));
+        if (aliasResults.isNoAlias(MemoryLocation::get(loadInstAndStores.first), MemoryLocation::get(storeInst))
+            || (loadInstAndStores.first->getPointerOperand()->getType() != storeInst->getPointerOperand()->getType())) {
+              --sizeAfter;
+            }
+
+        if (loadInstAndStores.first->getPointerOperand()->getType() != storeInst->getPointerOperand()->getType()) {
+          errs() << "diff types! " << *loadInstAndStores.first->getPointerOperand() << ' ' << *storeInst->getPointerOperand() << '\n';
+        }
+        return aliasResults.isNoAlias(MemoryLocation::get(loadInstAndStores.first), MemoryLocation::get(storeInst))
+            || (loadInstAndStores.first->getPointerOperand()->getType() != storeInst->getPointerOperand()->getType()); 
+            // TOCHECK: not great, assumes no alias of loads to different types, but makes thing easier
       });
-    }
+      assert(sizeBefore == sizeAfter); // remove if does nott work lol why
+    } 
 
     llvm::remove_if(hoistLoadsToStores, [&](const auto& loadInstAndStores) {
       return loadInstAndStores.second.empty();
@@ -264,11 +281,13 @@ struct LICMAliasProfilePass : public LoopPass {
     return hoistLoadsToStores;
   }
 
-  void insertFixUpCode(Loop *L, LoadInst* loadInst, StoreInst* storeInst, LoadInst* headerLoadValue) {
-    auto* compForAlias = new ICmpInst(*storeInst->getParent(), ICmpInst::ICMP_EQ, storeInst->getPointerOperand(), loadInst->getPointerOperand());
+  void fixUpForStore(Loop *L, LoadInst* ogLoadInst, StoreInst* storeInst, AllocaInst* hoistedValue) {
+    errs() << *ogLoadInst << ' ' << *storeInst<<'\n';
+    errs() << *ogLoadInst->getPointerOperand()->getType() << ' ' << *storeInst->getPointerOperand()->getType()<<'\n';
+    auto* compForAlias = new ICmpInst(*storeInst->getParent(), ICmpInst::ICMP_EQ, storeInst->getPointerOperand(), ogLoadInst->getPointerOperand());
 
     auto* storeBB = storeInst->getParent();
-    auto* followingBB = storeBB->splitBasicBlock(storeInst);
+    auto* followingBB = storeBB->splitBasicBlock(compForAlias);
     storeBB->getInstList().back().eraseFromParent(); // erase unconditional branch added by splitBasicBlock
 
     auto* f = storeBB->getParent();
@@ -276,31 +295,34 @@ struct LICMAliasProfilePass : public LoopPass {
     auto* condCheckToFixUpBranch = BranchInst::Create(fixUpBB, followingBB, compForAlias, storeBB);
     auto* fixUpEndBranch = BranchInst::Create(followingBB, fixUpBB);
 
-    auto* fixUpStore = new StoreInst(storeInst->getValueOperand(), headerLoadValue, fixUpBB);
+    auto* fixUpStore = new StoreInst(storeInst->getValueOperand(), hoistedValue, fixUpBB);
   }
 
-  void hoistLoadAndInsertFixUp(Loop *L, LoadInst* loadInst, const std::vector<StoreInst*> dependentStores) {
-    auto* function = loadInst->getParent()->getParent();
+  void hoistLoadAndInsertFixUp(Loop *L, LoadInst* ogLoadInst, const std::vector<StoreInst*> dependentStores) {
+    auto* function = ogLoadInst->getParent()->getParent();
     auto& entryBB = function->getEntryBlock();
 
     /* Function Entry Block */
-    auto* loadValueVar = new AllocaInst(loadInst->getType(), 0, nullptr, "", &(*entryBB.begin()));
+    auto* hoistedValue = new AllocaInst(ogLoadInst->getType(), 0, nullptr, "", &(*entryBB.begin()));
+    errs() << *hoistedValue << ' ' << *ogLoadInst << "\n\n";
 
     /* Loop Preheader */
-    auto* initVal = new LoadInst(loadInst, "", L->getLoopPreheader()->getTerminator());
-    auto* storeInitVal = new StoreInst(initVal, loadValueVar, L->getLoopPreheader()->getTerminator());
+    auto* initVal = new LoadInst(ogLoadInst->getPointerOperand(), "", L->getLoopPreheader()->getTerminator());
+    auto* storeInitVal = new StoreInst(initVal, hoistedValue, L->getLoopPreheader()->getTerminator());
 
     /* Loop header */
-    auto* headerLoadValue = new LoadInst(loadValueVar, "", loadInst);
+    auto* headerLoadValue = new LoadInst(hoistedValue, "", ogLoadInst);
 
     for (auto* storeInst : dependentStores) {
-      insertFixUpCode(L, loadInst, storeInst, headerLoadValue);
+      errs() << *storeInst << '\n';
+      fixUpForStore(L, ogLoadInst, storeInst, hoistedValue);
     }
+
+    ogLoadInst->replaceAllUsesWith(headerLoadValue);
+    ogLoadInst->eraseFromParent();
   }
 
   bool runOnLoop(Loop *L, LPPassManager &LPM) override {
-    bool changed = false;
-
     /* 1. use the log analysis to determine if there are any loads worth hoisting */
     auto mostlyInvariantLoads = getMostlyInvariantLoads(L);
     for (auto& [loadInst, dependentStores] : mostlyInvariantLoads) {
@@ -312,7 +334,7 @@ struct LICMAliasProfilePass : public LoopPass {
       // loadInst->moveBefore(L->getLoopPreheader()->getTerminator());
     }
 
-    return changed;
+    return !mostlyInvariantLoads.empty();
   }
 }; // end of struct LICMAliasProfilePass
 }  // end of anonymous namespace
