@@ -1,12 +1,12 @@
 digraph "CFG for 'GetRandIdxSometimes' function" {
 	label="CFG for 'GetRandIdxSometimes' function";
 
-	Node0x55c9860596b0 [shape=record,label="{entry:\l  %percent_likelihood_same.addr = alloca i32, align 4\l  %orig.addr = alloca i32, align 4\l  store i32 %percent_likelihood_same, i32* %percent_likelihood_same.addr,\l... align 4\l  store i32 %orig, i32* %orig.addr, align 4\l  %call = call i32 @rand() #3\l  %rem = srem i32 %call, 100\l  %0 = load i32, i32* %percent_likelihood_same.addr, align 4\l  %cmp = icmp slt i32 %rem, %0\l  br i1 %cmp, label %cond.true, label %cond.false\l|{<s0>T|<s1>F}}"];
-	Node0x55c9860596b0:s0 -> Node0x55c98605b830;
-	Node0x55c9860596b0:s1 -> Node0x55c98605b880;
-	Node0x55c98605b830 [shape=record,label="{cond.true:                                        \l  %1 = load i32, i32* %orig.addr, align 4\l  br label %cond.end\l}"];
-	Node0x55c98605b830 -> Node0x55c98605b8d0;
-	Node0x55c98605b880 [shape=record,label="{cond.false:                                       \l  %2 = load i32, i32* %orig.addr, align 4\l  %add = add nsw i32 %2, 1\l  %rem1 = srem i32 %add, 6\l  br label %cond.end\l}"];
-	Node0x55c98605b880 -> Node0x55c98605b8d0;
-	Node0x55c98605b8d0 [shape=record,label="{cond.end:                                         \l  %cond = phi i32 [ %1, %cond.true ], [ %rem1, %cond.false ]\l  ret i32 %cond\l}"];
+	Node0x55efbe8de6d0 [shape=record,label="{entry:\l  %percent_likelihood_same.addr = alloca i32, align 4\l  %orig.addr = alloca i32, align 4\l  store i32 %percent_likelihood_same, i32* %percent_likelihood_same.addr,\l... align 4\l  store i32 %orig, i32* %orig.addr, align 4\l  %call = call i32 @rand() #3\l  %rem = srem i32 %call, 100\l  %0 = load i32, i32* %percent_likelihood_same.addr, align 4\l  %cmp = icmp slt i32 %rem, %0\l  br i1 %cmp, label %cond.true, label %cond.false\l|{<s0>T|<s1>F}}"];
+	Node0x55efbe8de6d0:s0 -> Node0x55efbe8e0850;
+	Node0x55efbe8de6d0:s1 -> Node0x55efbe8e08a0;
+	Node0x55efbe8e0850 [shape=record,label="{cond.true:                                        \l  %1 = load i32, i32* %orig.addr, align 4\l  br label %cond.end\l}"];
+	Node0x55efbe8e0850 -> Node0x55efbe8e08f0;
+	Node0x55efbe8e08a0 [shape=record,label="{cond.false:                                       \l  %2 = load i32, i32* %orig.addr, align 4\l  %add = add nsw i32 %2, 1\l  %rem1 = srem i32 %add, 6\l  br label %cond.end\l}"];
+	Node0x55efbe8e08a0 -> Node0x55efbe8e08f0;
+	Node0x55efbe8e08f0 [shape=record,label="{cond.end:                                         \l  %cond = phi i32 [ %1, %cond.true ], [ %rem1, %cond.false ]\l  ret i32 %cond\l}"];
 }

@@ -20,4 +20,25 @@ real	0m1.334s
 percent likelihood: 10
 real	0m1.413s
 percent likelihood: 0
-real	0m1.487s
+real	0m1.487spercent likelihood: 100
+real	0m0.036s
+percent likelihood: 90
+real	0m0.045s
+percent likelihood: 80
+real	0m0.036s
+percent likelihood: 70
+real	0m0.046s
+percent likelihood: 60
+real	0m0.036s
+percent likelihood: 50
+real	0m0.037s
+percent likelihood: 40
+real	0m0.036s
+percent likelihood: 30
+real	0m0.036s
+percent likelihood: 20
+real	0m0.054s
+percent likelihood: 10
+real	0m0.046s
+percent likelihood: 0
+real	0m0.037s

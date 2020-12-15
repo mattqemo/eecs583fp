@@ -1,8 +1,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include "../../fp.h"
 
 int main(int argc, char* argv[]) {
+	if (argc != 2) {
+		printf("bad bad no\n");
+		return 1;
+	}
 	double A[1000];
 	int i;
 	for(i = 0; i < 1000; i++){

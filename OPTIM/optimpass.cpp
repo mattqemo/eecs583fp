@@ -218,37 +218,48 @@ struct LICMAliasProfilePass : public LoopPass {
     AU.addRequired<AAResultsWrapperPass>();
   }
 
+  template <typename INST_T, typename BB_CONTAINER_T>
+  void forEachInstOfType(const BB_CONTAINER_T& bbs, const std::function<void(INST_T*)>& action) {
+    for (auto* bb : bbs)
+      for (auto& inst: *bb)
+        if (auto* typedInst = dyn_cast<INST_T>(&inst))
+          action(typedInst);
+  }
+
+  /*
+    Return a map from mostly invariant loads to stores which might alias with them
+    Loads which are statically determined to be completely or never invariant are not returned
+  */
   llvm::DenseMap<LoadInst*, std::vector<StoreInst*>> getMostlyInvariantLoads(Loop *L) {
     auto& instLogAnalysis = getAnalysis<fp583::InstLogAnalysisWrapperPass>().getInstLogAnalysis();
     auto& aliasResults = getAnalysis<AAResultsWrapperPass>().getAAResults();
     llvm::DenseMap<LoadInst*, std::vector<StoreInst*>> hoistLoadsToStores;
 
-    for (auto* bb : L->getBlocks()) {
-      for (auto& inst : *bb) {
-        if (auto* loadInst = dyn_cast<LoadInst>(&inst)) {
-          hoistLoadsToStores[loadInst] = {}; // TODO: init with all stores in loop
-        }
-      }
+    // Collect all stores
+    auto allStores = std::vector<StoreInst*>{};
+    forEachInstOfType<StoreInst>(L->getBlocks(), [&allStores](auto* storeInst){ allStores.push_back(storeInst); });
+    // All loads map to all stores initially
+    forEachInstOfType<LoadInst>(L->getBlocks(), [&hoistLoadsToStores, &allStores](auto* loadInst){ hoistLoadsToStores[loadInst] = allStores; });
+
+    // Remove any loads which must-alias with any stores, or which are too likely to alias
+    llvm::remove_if(hoistLoadsToStores, [&](const auto& loadInstAndStores) {
+      return llvm::any_of(loadInstAndStores.second, [&](auto* storeInst) {
+        auto memLoc1 = MemoryLocation::get(loadInstAndStores.first), memLoc2 = MemoryLocation::get(storeInst);
+        return aliasResults.isMustAlias(memLoc1, memLoc2) || instLogAnalysis.getAliasProbability(memLoc1, memLoc2) > aliasProbaThreshold;
+      });
+    });
+
+    // Remove any load/store pairs which are known to never alias
+    for (auto& loadInstAndStores : hoistLoadsToStores) {
+      llvm::remove_if(loadInstAndStores.second, [&](auto* storeInst) {
+        return aliasResults.isNoAlias(MemoryLocation::get(loadInstAndStores.first), MemoryLocation::get(storeInst));
+      });
     }
 
-    /*
-    start with  stores to fix up = ALL
-    for every store and loads to hoist:
-      if is MUST alias || (proba alias > threshold) --> remove load to hoist from set (shouldn't hoist)
-      if is WILL NOT alias --> remove store from dependent stores vec (no fix up ever needed)
-    */
-    for (auto* bb : L->getBlocks()) {
-      for (auto& inst : *bb) {
-        if (auto* storeInst = dyn_cast<StoreInst>(&inst)) {
-          llvm::remove_if(hoistLoadsToStores, [&](const auto& loadInstAndStore) {
-            auto memLoc1 = MemoryLocation::get(loadInstAndStore.first), memLoc2 = MemoryLocation::get(storeInst);
-            return
-              aliasResults.isMustAlias(memLoc1, memLoc2) ||
-              instLogAnalysis.getAliasProbability(memLoc1, memLoc2) > aliasProbaThreshold;
-          });
-        }
-      }
-    }
+    llvm::remove_if(hoistLoadsToStores, [&](const auto& loadInstAndStores) {
+      return loadInstAndStores.second.empty();
+    });
+
     return hoistLoadsToStores;
   }
 
@@ -258,7 +269,11 @@ struct LICMAliasProfilePass : public LoopPass {
     /* 1. use the log analysis to determine if there are any loads worth hoisting */
     auto mostlyInvariantLoads = getMostlyInvariantLoads(L);
     for (auto& [loadInst, dependentStores] : mostlyInvariantLoads) {
-      loadInst->moveBefore(L->getLoopPreheader()->getTerminator());
+      errs() << "load is mostly invariant: " << *loadInst << "\n";
+      // TODO: hoist load inst to preheader
+      //      hoist dependent instructions (math)
+      //      add re-calculation code in fixup when a store to the same pointer happens
+      // loadInst->moveBefore(L->getLoopPreheader()->getTerminator());
     }
 
     return changed;
@@ -267,7 +282,7 @@ struct LICMAliasProfilePass : public LoopPass {
 }  // end of anonymous namespace
 
 char FuncCallsAliasProfilePass::ID = 0;
-char LICMAliasProfilePass::ID = 0;
+char LICMAliasProfilePass::ID = 1;
 static RegisterPass<FuncCallsAliasProfilePass> x("fp_funcoptim", "FuncCallsAliasProfilePass Pass",
                              false /* Only looks at CFG */,
                              false /* Analysis Pass */);

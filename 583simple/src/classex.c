@@ -14,7 +14,7 @@ void ConstructNum(Num_t* self, int* valPtr_in) {
 
 double fn_PURE_(int val) {
   double d = 3.7;
-  for (int i = 0; i < 1000; ++i) {
+  for (int i = 0; i < 64; ++i) {
     d = (int)((val + 2.0) / 10) % 7 + 1.0;
   }
   return d;
