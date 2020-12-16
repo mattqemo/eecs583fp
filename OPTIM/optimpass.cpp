@@ -41,6 +41,10 @@ https://stackoverflow.com/questions/10990018/how-to-generate-assembly-code-with-
 
 namespace {
 
+bool isFunctionPure(Function* f) {
+  return f->getName().contains("_PURE_");
+}
+
 struct FuncCallsAliasProfilePass : public ModulePass {
   static char ID;
   double aliasProbaThreshold = 0.80;
@@ -82,9 +86,7 @@ struct FuncCallsAliasProfilePass : public ModulePass {
     return true;
   }
 
-  bool isFunctionPure(Function* f) {
-    return f->getName().contains("_PURE_");
-  }
+ 
 
 
   Instruction* generateFixUpICmp(CallBase* ogCall, const std::vector<std::pair<Value*, Value*>>& ptrArgsVals) {
@@ -168,7 +170,6 @@ struct FuncCallsAliasProfilePass : public ModulePass {
 
               // check !ptrArgsVals.empty() to limit scope to only calls with ptr input
               if (areFunctionCallsIdentical(instLogAnalysis, currCall, prevCall, ptrArgsVals) && !ptrArgsVals.empty()) {
-                // errs() << "optim function call: " << fCalled->getName() << "\n";
                 auto* fixUpBB = removeFunctionCallAndFixUp(currCall, prevCall, ptrArgsVals);
                 fixUpBBs.insert(fixUpBB);
                 changed = true;
@@ -211,10 +212,10 @@ struct LICMAliasProfilePass : public LoopPass {
   static char ID;
   double aliasProbaThreshold = 0.02;
 
-
   LICMAliasProfilePass() : LoopPass(ID) {}
 
   void getAnalysisUsage(AnalysisUsage& AU) const override {
+    AU.addRequired<LoopInfoWrapperPass>();
     AU.addRequired<fp583::InstLogAnalysisWrapperPass>();
     AU.addRequired<AAResultsWrapperPass>();
   }
@@ -227,111 +228,138 @@ struct LICMAliasProfilePass : public LoopPass {
           action(typedInst);
   }
 
+
   /*
     Return a map from mostly invariant loads to stores which might alias with them
     Loads which are statically determined to be completely or never invariant are not returned
   */
-  llvm::DenseMap<LoadInst*, std::vector<StoreInst*>> getMostlyInvariantLoads(Loop *L) {
+  std::map<LoadInst*, std::vector<StoreInst*>> getMostlyInvariantLoads(Loop *L) {
     auto& instLogAnalysis = getAnalysis<fp583::InstLogAnalysisWrapperPass>().getInstLogAnalysis();
     auto& aliasResults = getAnalysis<AAResultsWrapperPass>().getAAResults();
-    llvm::DenseMap<LoadInst*, std::vector<StoreInst*>> hoistLoadsToStores;
+    std::map<LoadInst*, std::vector<StoreInst*>> hoistLoadsToStores;
 
     // Collect all stores
     auto allStores = std::vector<StoreInst*>{};
     forEachInstOfType<StoreInst>(L->getBlocks(), [&allStores](auto* storeInst){ allStores.push_back(storeInst); });
     // All loads map to all stores initially
-    forEachInstOfType<LoadInst>(L->getBlocks(), [L, &hoistLoadsToStores, &allStores](auto* loadInst){
-      if (L->isLoopInvariant(loadInst->getPointerOperand())) { // need pointer to be loop invariant
+    forEachInstOfType<LoadInst>(L->getBlocks(), [this, L, &hoistLoadsToStores, &allStores](auto* loadInst){
+      auto* ptrOp = loadInst->getPointerOperand();
+      auto* loadOp = dyn_cast<LoadInst>(ptrOp);
+      // check if pointer is invariant, if result from a load, check if it'll be hoisted
+      if (loadOp && hoistLoadsToStores.count(loadOp) || L->isLoopInvariant(ptrOp)) {
         hoistLoadsToStores[loadInst] = allStores; 
       }
     });
 
     // Remove any loads which must-alias with any stores, or which are too likely to alias
-    llvm::remove_if(hoistLoadsToStores, [&](const auto& loadInstAndStores) {
-      return llvm::any_of(loadInstAndStores.second, [&](auto* storeInst) {
-        auto memLoc1 = MemoryLocation::get(loadInstAndStores.first), memLoc2 = MemoryLocation::get(storeInst);
+    for (auto it = begin(hoistLoadsToStores); it != end(hoistLoadsToStores); ) {
+      if (llvm::any_of(it->second, [&](auto* storeInst) {
+        auto memLoc1 = MemoryLocation::get(it->first), memLoc2 = MemoryLocation::get(storeInst);
         return aliasResults.isMustAlias(memLoc1, memLoc2) || instLogAnalysis.getAliasProbability(memLoc1, memLoc2) > aliasProbaThreshold;
-      });
-    });
+      })) {
+        it = hoistLoadsToStores.erase(it);
+      }
+      else ++it;
+    } // can't use remove_if on std::map, and llvm::remove_if doesn't erase, and a map doesn't have range-based erase
 
     // Remove any load/store pairs which are known to never alias
-    for (auto& loadInstAndStores : hoistLoadsToStores) {
-      int sizeBefore = loadInstAndStores.second.size();
-      int sizeAfter = sizeBefore;
-      llvm::remove_if(loadInstAndStores.second, [&](auto* storeInst) {
-        if (aliasResults.isNoAlias(MemoryLocation::get(loadInstAndStores.first), MemoryLocation::get(storeInst))
-            || (loadInstAndStores.first->getPointerOperand()->getType() != storeInst->getPointerOperand()->getType())) {
-              --sizeAfter;
-            }
-
-        if (loadInstAndStores.first->getPointerOperand()->getType() != storeInst->getPointerOperand()->getType()) {
-          errs() << "diff types! " << *loadInstAndStores.first->getPointerOperand() << ' ' << *storeInst->getPointerOperand() << '\n';
-        }
-        return aliasResults.isNoAlias(MemoryLocation::get(loadInstAndStores.first), MemoryLocation::get(storeInst))
-            || (loadInstAndStores.first->getPointerOperand()->getType() != storeInst->getPointerOperand()->getType()); 
+    for (auto& [loadInst, dependentStores] : hoistLoadsToStores) {
+      auto end_it = llvm::remove_if(dependentStores, [&](auto* storeInst) {
+        return aliasResults.isNoAlias(MemoryLocation::get(loadInst), MemoryLocation::get(storeInst))
+            || (loadInst->getPointerOperand()->getType() != storeInst->getPointerOperand()->getType()); 
             // TOCHECK: not great, assumes no alias of loads to different types, but makes thing easier
       });
-      assert(sizeBefore == sizeAfter); // remove if does nott work lol why
+      
+      dependentStores.erase(end_it, dependentStores.end());
     } 
-
-    llvm::remove_if(hoistLoadsToStores, [&](const auto& loadInstAndStores) {
-      return loadInstAndStores.second.empty();
-    });
 
     return hoistLoadsToStores;
   }
 
-  void fixUpForStore(Loop *L, LoadInst* ogLoadInst, StoreInst* storeInst, AllocaInst* hoistedValue) {
-    errs() << *ogLoadInst << ' ' << *storeInst<<'\n';
-    errs() << *ogLoadInst->getPointerOperand()->getType() << ' ' << *storeInst->getPointerOperand()->getType()<<'\n';
-    auto* compForAlias = new ICmpInst(*storeInst->getParent(), ICmpInst::ICMP_EQ, storeInst->getPointerOperand(), ogLoadInst->getPointerOperand());
-
+  void fixUpForStore(Loop *L, LoadInst* ogLoadInst, StoreInst* storeInst, AllocaInst* hoistedValue, CallBase* call, Value* ogPtrOp, LoopInfo* LI) {
+    auto* compForAlias = new ICmpInst(storeInst->getNextNode(), ICmpInst::ICMP_EQ, storeInst->getPointerOperand(), ogPtrOp);
     auto* storeBB = storeInst->getParent();
-    auto* followingBB = storeBB->splitBasicBlock(compForAlias);
+    auto* followingBB = storeBB->splitBasicBlock(compForAlias->getNextNode());
+    L->addBasicBlockToLoop(followingBB, *LI);
     storeBB->getInstList().back().eraseFromParent(); // erase unconditional branch added by splitBasicBlock
-
+    
     auto* f = storeBB->getParent();
     auto* fixUpBB = BasicBlock::Create(f->getContext(), "", f);
+    L->addBasicBlockToLoop(fixUpBB, *LI);
     auto* condCheckToFixUpBranch = BranchInst::Create(fixUpBB, followingBB, compForAlias, storeBB);
     auto* fixUpEndBranch = BranchInst::Create(followingBB, fixUpBB);
 
-    auto* fixUpStore = new StoreInst(storeInst->getValueOperand(), hoistedValue, fixUpBB);
+    auto* loadParam = new LoadInst(ogPtrOp, "", fixUpBB->getTerminator());
+    auto* callVal = CallInst::Create(call->getFunctionType(), call->getCalledFunction(), {loadParam}, "", fixUpBB->getTerminator());
+    auto* fixUpStore = new StoreInst(callVal, hoistedValue, fixUpBB->getTerminator());
   }
 
-  void hoistLoadAndInsertFixUp(Loop *L, LoadInst* ogLoadInst, const std::vector<StoreInst*> dependentStores) {
+  /* We only hoist loads and dependent pure function calls for this example
+    Not all loads have dependent pure function calls, so we handle the 2 cases a bit differently
+  */
+  void hoistLoadAndInsertFixUp(Loop *L, LoadInst* ogLoadInst, const std::vector<StoreInst*> dependentStores, std::unordered_map<LoadInst*, Value*>& loopLoadToHoisted, LoopInfo* LI) {
+    CallBase* call = nullptr;
+    for(auto* U : ogLoadInst->users()){  // find the dependent pure func call
+      if (auto* callBase = dyn_cast<CallBase>(U)){
+        if (isFunctionPure(callBase->getCalledFunction())) {
+          call = callBase;
+          break;
+        }
+      }
+    }
+      
     auto* function = ogLoadInst->getParent()->getParent();
     auto& entryBB = function->getEntryBlock();
 
     /* Function Entry Block */
-    auto* hoistedValue = new AllocaInst(ogLoadInst->getType(), 0, nullptr, "", &(*entryBB.begin()));
-    errs() << *hoistedValue << ' ' << *ogLoadInst << "\n\n";
+    auto* hoistedType = call ? call->getType() : ogLoadInst->getType();
+    auto* hoistedValue = new AllocaInst(hoistedType, 0, nullptr, "", &(*entryBB.begin()));
 
     /* Loop Preheader */
-    auto* initVal = new LoadInst(ogLoadInst->getPointerOperand(), "", L->getLoopPreheader()->getTerminator());
+    Instruction* initVal;
+    LoadInst* initLoad;
+
+    /* this part is needed because the load for a pure func arg can be dependent on another loop invariant loads, which
+       would have already been hoisted -> ptrOperand used in pre-header has to be updated */
+    auto* loadPtrOp = ogLoadInst->getPointerOperand();
+    auto* ogPtrOp = loopLoadToHoisted.count(dyn_cast<LoadInst>(loadPtrOp)) ? loopLoadToHoisted[dyn_cast<LoadInst>(loadPtrOp)] : loadPtrOp;
+    
+    if (call) {
+      initLoad = new LoadInst(ogPtrOp, "", L->getLoopPreheader()->getTerminator());
+      auto* calledFunction = call->getCalledFunction();
+      initVal = CallInst::Create(calledFunction->getFunctionType(), calledFunction, {initLoad}, "", L->getLoopPreheader()->getTerminator());
+    }
+    else {
+      initVal = new LoadInst(ogPtrOp, "",  L->getLoopPreheader()->getTerminator());
+    }
     auto* storeInitVal = new StoreInst(initVal, hoistedValue, L->getLoopPreheader()->getTerminator());
 
     /* Loop header */
     auto* headerLoadValue = new LoadInst(hoistedValue, "", ogLoadInst);
 
     for (auto* storeInst : dependentStores) {
-      errs() << *storeInst << '\n';
-      fixUpForStore(L, ogLoadInst, storeInst, hoistedValue);
+      fixUpForStore(L, ogLoadInst, storeInst, hoistedValue, call, ogPtrOp, LI);
     }
 
-    ogLoadInst->replaceAllUsesWith(headerLoadValue);
+    if (call) {
+      call->replaceAllUsesWith(headerLoadValue);
+      call->eraseFromParent();
+    }
+    else {
+      ogLoadInst->replaceAllUsesWith(headerLoadValue);
+      loopLoadToHoisted[headerLoadValue] = initVal;
+    }
     ogLoadInst->eraseFromParent();
   }
 
   bool runOnLoop(Loop *L, LPPassManager &LPM) override {
-    /* 1. use the log analysis to determine if there are any loads worth hoisting */
+    // if (L->getBlocks().front()->getParent()->getName() != "main") return false;
     auto mostlyInvariantLoads = getMostlyInvariantLoads(L);
+    std::unordered_map<LoadInst*, Value*> loopLoadToHoisted;
+    auto* LI = &getAnalysis<LoopInfoWrapperPass>().getLoopInfo();
+
     for (auto& [loadInst, dependentStores] : mostlyInvariantLoads) {
-      errs() << "load is mostly invariant: " << *loadInst << "\n";
-      hoistLoadAndInsertFixUp(L, loadInst, dependentStores);
-      // TODO: hoist load inst to preheader
-      //      hoist dependent instructions (math)
-      //      add re-calculation code in fixup when a store to the same pointer happens
-      // loadInst->moveBefore(L->getLoopPreheader()->getTerminator());
+      hoistLoadAndInsertFixUp(L, loadInst, dependentStores, loopLoadToHoisted, LI);
     }
 
     return !mostlyInvariantLoads.empty();

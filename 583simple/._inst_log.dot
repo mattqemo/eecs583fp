@@ -1,10 +1,10 @@
 digraph "CFG for '_inst_log' function" {
 	label="CFG for '_inst_log' function";
 
-	Node0x558ef39a3840 [shape=record,label="{entry:\l  %instID.addr = alloca i64, align 8\l  %addr.addr = alloca i8*, align 8\l  store i64 %instID, i64* %instID.addr, align 8\l  store i8* %addr, i8** %addr.addr, align 8\l  %0 = load %struct._IO_FILE*, %struct._IO_FILE** @_inst_log.instLogFile,\l... align 8\l  %cmp = icmp eq %struct._IO_FILE* %0, null\l  br i1 %cmp, label %if.then, label %if.end\l|{<s0>T|<s1>F}}"];
-	Node0x558ef39a3840:s0 -> Node0x558ef39aacc0;
-	Node0x558ef39a3840:s1 -> Node0x558ef39aad10;
-	Node0x558ef39aacc0 [shape=record,label="{if.then:                                          \l  %call = call %struct._IO_FILE* @fopen(i8* getelementptr inbounds ([8 x i8],\l... [8 x i8]* @.str, i64 0, i64 0), i8* getelementptr inbounds ([3 x i8], [3 x\l... i8]* @.str.1, i64 0, i64 0))\l  store %struct._IO_FILE* %call, %struct._IO_FILE** @_inst_log.instLogFile,\l... align 8\l  br label %if.end\l}"];
-	Node0x558ef39aacc0 -> Node0x558ef39aad10;
-	Node0x558ef39aad10 [shape=record,label="{if.end:                                           \l  %1 = load %struct._IO_FILE*, %struct._IO_FILE** @_inst_log.instLogFile,\l... align 8\l  %2 = load i64, i64* %instID.addr, align 8\l  %3 = load i8*, i8** %addr.addr, align 8\l  %call1 = call i32 (%struct._IO_FILE*, i8*, ...) @fprintf(%struct._IO_FILE*\l... %1, i8* getelementptr inbounds ([8 x i8], [8 x i8]* @.str.2, i64 0, i64 0),\l... i64 %2, i8* %3)\l  ret void\l}"];
+	Node0x556059a45810 [shape=record,label="{entry:\l  %instID.addr = alloca i64, align 8\l  %addr.addr = alloca i8*, align 8\l  store i64 %instID, i64* %instID.addr, align 8\l  store i8* %addr, i8** %addr.addr, align 8\l  %0 = load %struct._IO_FILE*, %struct._IO_FILE** @_inst_log.instLogFile,\l... align 8\l  %cmp = icmp eq %struct._IO_FILE* %0, null\l  br i1 %cmp, label %if.then, label %if.end\l|{<s0>T|<s1>F}}"];
+	Node0x556059a45810:s0 -> Node0x556059a51c70;
+	Node0x556059a45810:s1 -> Node0x556059a51cc0;
+	Node0x556059a51c70 [shape=record,label="{if.then:                                          \l  %call = call %struct._IO_FILE* @fopen(i8* getelementptr inbounds ([8 x i8],\l... [8 x i8]* @.str, i64 0, i64 0), i8* getelementptr inbounds ([3 x i8], [3 x\l... i8]* @.str.1, i64 0, i64 0))\l  store %struct._IO_FILE* %call, %struct._IO_FILE** @_inst_log.instLogFile,\l... align 8\l  br label %if.end\l}"];
+	Node0x556059a51c70 -> Node0x556059a51cc0;
+	Node0x556059a51cc0 [shape=record,label="{if.end:                                           \l  %1 = load %struct._IO_FILE*, %struct._IO_FILE** @_inst_log.instLogFile,\l... align 8\l  %2 = load i64, i64* %instID.addr, align 8\l  %3 = load i8*, i8** %addr.addr, align 8\l  %call1 = call i32 (%struct._IO_FILE*, i8*, ...) @fprintf(%struct._IO_FILE*\l... %1, i8* getelementptr inbounds ([8 x i8], [8 x i8]* @.str.2, i64 0, i64 0),\l... i64 %2, i8* %3)\l  ret void\l}"];
 }

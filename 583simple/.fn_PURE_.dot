@@ -1,14 +1,5 @@
 digraph "CFG for 'fn_PURE_' function" {
 	label="CFG for 'fn_PURE_' function";
 
-	Node0x55efbe8ddf90 [shape=record,label="{entry:\l  %val.addr = alloca i32, align 4\l  %d = alloca double, align 8\l  %i = alloca i32, align 4\l  store i32 %val, i32* %val.addr, align 4\l  store double 3.700000e+00, double* %d, align 8\l  store i32 0, i32* %i, align 4\l  br label %for.cond\l}"];
-	Node0x55efbe8ddf90 -> Node0x55efbe8de590;
-	Node0x55efbe8de590 [shape=record,label="{for.cond:                                         \l  %0 = load i32, i32* %i, align 4\l  %cmp = icmp slt i32 %0, 1000\l  br i1 %cmp, label %for.body, label %for.end\l|{<s0>T|<s1>F}}"];
-	Node0x55efbe8de590:s0 -> Node0x55efbe8de5e0;
-	Node0x55efbe8de590:s1 -> Node0x55efbe8de680;
-	Node0x55efbe8de5e0 [shape=record,label="{for.body:                                         \l  %1 = load i32, i32* %val.addr, align 4\l  %conv = sitofp i32 %1 to double\l  %add = fadd double %conv, 2.000000e+00\l  %div = fdiv double %add, 1.000000e+01\l  %conv1 = fptosi double %div to i32\l  %rem = srem i32 %conv1, 7\l  %conv2 = sitofp i32 %rem to double\l  %add3 = fadd double %conv2, 1.000000e+00\l  store double %add3, double* %d, align 8\l  br label %for.inc\l}"];
-	Node0x55efbe8de5e0 -> Node0x55efbe8de630;
-	Node0x55efbe8de630 [shape=record,label="{for.inc:                                          \l  %2 = load i32, i32* %i, align 4\l  %inc = add nsw i32 %2, 1\l  store i32 %inc, i32* %i, align 4\l  br label %for.cond\l}"];
-	Node0x55efbe8de630 -> Node0x55efbe8de590;
-	Node0x55efbe8de680 [shape=record,label="{for.end:                                          \l  %3 = load double, double* %d, align 8\l  ret double %3\l}"];
+	Node0x556059a52f80 [shape=record,label="{entry:\l  %x.addr = alloca double, align 8\l  store double %x, double* %x.addr, align 8\l  %0 = load double, double* %x.addr, align 8\l  %mul = fmul double %0, 0x400921FB4D12D84A\l  %add = fadd double %mul, 0x40AED87A52695960\l  %div = fdiv double %add, 2.750000e+01\l  ret double %div\l}"];
 }
